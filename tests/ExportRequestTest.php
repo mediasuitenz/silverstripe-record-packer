@@ -7,6 +7,7 @@ use MadeCurious\RecordPacker\Security\ImportExportPermissions;
 use MadeCurious\RecordPacker\Tests\Fixtures\TestCatalogue;
 use MadeCurious\RecordPacker\Tests\Fixtures\TestProduct;
 use MadeCurious\RecordPacker\Tests\Fixtures\TestVersionedRecord;
+use SilverStripe\Control\Controller;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use Symbiote\QueuedJobs\Controllers\QueuedJobsAdmin;
@@ -320,10 +321,30 @@ class ExportRequestTest extends SapphireTest
         $request->write();
 
         $html = $request->getStatusLinkHtml();
-        $expectedLink = QueuedJobsAdmin::singleton()->getCMSEditLinkForManagedDataObject($descriptor);
 
-        $this->assertStringContainsString('<a href="' . htmlspecialchars($expectedLink) . '"', $html);
+        // Deliberately NOT compared against
+        // QueuedJobsAdmin::singleton()->getCMSEditLinkForManagedDataObject($descriptor) — that
+        // generic helper gets the wrong field-name segment for this specific admin (see
+        // ExportRequest::queuedJobEditLink()'s own doc comment) and produces a link
+        // FormRequestHandler can't actually route.
+        $this->assertStringContainsString(
+            '<a href="' . htmlspecialchars(
+                Controller::join_links(
+                    QueuedJobsAdmin::singleton()->getLinkForModelClass(QueuedJobDescriptor::class),
+                    'EditForm/field/QueuedJobDescriptor/item/' . $descriptor->ID . '/edit'
+                )
+            ) . '"',
+            $html
+        );
         $this->assertStringContainsString('>Queued<', $html);
+
+        // Regression guard for the actual bug: the sanitised-FQCN field-name segment is correct
+        // in the base admin URL (asserted above), but must NOT also appear as the field segment
+        // after EditForm/field/ — FormRequestHandler can't route that sub-URL.
+        $this->assertStringNotContainsString(
+            'EditForm/field/Symbiote-QueuedJobs-DataObjects-QueuedJobDescriptor/item',
+            $html
+        );
     }
 
     public function testStatusLinkHtmlFallsBackToPlainTextWithoutPermission(): void

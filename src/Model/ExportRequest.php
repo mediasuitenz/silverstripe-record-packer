@@ -244,9 +244,34 @@ class ExportRequest extends DataObject
             return $status;
         }
 
-        $link = QueuedJobsAdmin::singleton()->getCMSEditLinkForManagedDataObject($descriptor);
+        $link = $this->queuedJobEditLink($descriptor);
 
         return '<a href="' . htmlspecialchars($link) . '">' . $status . '</a>';
+    }
+
+    /**
+     * ModelAdmin::getCMSEditLinkForManagedDataObject() — the obvious/generic way to build this —
+     * gets the wrong field-name segment for QueuedJobsAdmin specifically: it assumes the
+     * standard convention (the sanitised FQCN, e.g. "Symbiote-QueuedJobs-DataObjects-
+     * QueuedJobDescriptor"), but QueuedJobsAdmin::getEditForm() replaces the auto-scaffolded
+     * field with its own GridField hardcoded to the plain short name "QueuedJobDescriptor"
+     * instead (see that method's own `GridField::create('QueuedJobDescriptor', ...)` call) —
+     * using the generic helper produces a link FormRequestHandler can't route ("I can't handle
+     * sub-URLs on class SilverStripe\Forms\FormRequestHandler"). getLinkForModelClass() for the
+     * base URL is still reliable (it doesn't depend on the field name, just the model tab), so
+     * only the field-name segment and the trailing "/edit" are hand-built here to match what
+     * QueuedJobsAdmin's own form actually uses.
+     */
+    private function queuedJobEditLink(QueuedJobDescriptor $descriptor): string
+    {
+        $admin = QueuedJobsAdmin::singleton();
+
+        return Controller::join_links(
+            $admin->getLinkForModelClass(QueuedJobDescriptor::class),
+            'EditForm/field/QueuedJobDescriptor/item',
+            (string) $descriptor->ID,
+            'edit'
+        );
     }
 
     public function getDownloadLinkHtml(): string
