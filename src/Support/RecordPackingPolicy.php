@@ -39,7 +39,7 @@ class RecordPackingPolicy implements PackingPolicy
     {
         return (string) _t(
             self::class . '.LOCKED_WARNING',
-            'This record is currently being exported/imported by PagePacker.'
+            'This record is currently being exported/imported by Record Packer.'
             . ' Please try again in a minute or so.'
         );
     }

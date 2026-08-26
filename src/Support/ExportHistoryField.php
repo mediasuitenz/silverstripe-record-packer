@@ -12,8 +12,8 @@ use SilverStripe\ORM\DataObject;
 /**
  * Builds the read-only "Export history" GridField shown for a packable record's past
  * export/import attempts — a plain list + delete (no add/edit, since a history row is never
- * hand-authored), with {@see ExportRequest}'s `StaleBadge`/`DownloadLinkHtml` explicitly
- * formatted so they render as HTML rather than being escaped as plain text.
+ * hand-authored), with {@see ExportRequest}'s `StaleBadge`/`StatusLinkHtml`/`DownloadLinkHtml`
+ * explicitly formatted so they render as HTML rather than being escaped as plain text.
  *
  * Shared by {@see \MadeCurious\RecordPacker\Controllers\CMSPageContentExportController} (the
  * SiteTree/CMSMain "Content Export" tab) and {@see \MadeCurious\RecordPacker\Extensions\PackableExtension}
@@ -31,6 +31,7 @@ final class ExportHistoryField
         // using setFieldFormatting() to ensure we get rendered HTML
         $config->getComponentByType(GridFieldDataColumns::class)->setFieldFormatting([
             'StaleBadge' => fn ($value, $item) => $item->StaleBadge,
+            'StatusLinkHtml' => fn ($value, $item) => $item->StatusLinkHtml,
             'DownloadLinkHtml' => fn ($value, $item) => $item->DownloadLinkHtml,
             'IncludeAssets' => fn ($value, $item) => $item->IncludeAssets ? 'Yes' : 'No',
         ]);
