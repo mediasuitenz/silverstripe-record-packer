@@ -57,40 +57,4 @@
             closeModal(e.target);
         }
     });
-
-    var params = new URLSearchParams(window.location.search);
-    var toastMessage = params.get('page-packer-toast');
-
-    if (toastMessage) {
-        var container = document.querySelector('.toasts');
-
-        if (!container) {
-            container = document.createElement('div');
-            container.className = 'toasts';
-            document.body.appendChild(container);
-        }
-
-        // Defaults to "Export" for backwards compatibility — an export queued by a copy of the
-        // controller from before page-packer-toast-title existed still redirects without it.
-        var toastTitle = params.get('page-packer-toast-title') || 'Export';
-
-        var toast = document.createElement('div');
-        toast.className = 'toast toast--good';
-        toast.innerHTML = '<div class="toast-header"><strong></strong></div>'
-            + '<div class="toast-body"></div>';
-        toast.querySelector('.toast-header strong').textContent = toastTitle;
-        toast.querySelector('.toast-body').textContent = toastMessage;
-        container.appendChild(toast);
-
-        setTimeout(function () {
-            toast.remove();
-        }, 6000);
-
-        params.delete('page-packer-toast');
-        params.delete('page-packer-toast-title');
-
-        var newSearch = params.toString();
-        var newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
-        window.history.replaceState(null, '', newUrl);
-    }
 })();

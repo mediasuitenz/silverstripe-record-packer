@@ -115,13 +115,7 @@ class RecordPackerController extends Controller
 
         ExportQueuer::queue($record, RecordExportJob::class, $includeAssets, $description);
 
-        $message = _t(
-            self::class . '.QUEUED_FOR_EXPORT',
-            "Queued '{title}' for export.",
-            ['title' => $this->titleFor($record)]
-        );
-
-        return $this->redirectToReferer($message, (string) ($data['BackURL'] ?? ''));
+        return $this->redirectToReferer((string) ($data['BackURL'] ?? ''));
     }
 
     public function ImportModalForm(): Form
@@ -189,7 +183,7 @@ class RecordPackerController extends Controller
                 'bad'
             );
 
-            return $this->redirectToReferer(null, $backURL);
+            return $this->redirectToReferer($backURL);
         }
 
         $stub = $class::create();
@@ -206,17 +200,16 @@ class RecordPackerController extends Controller
         $job = new RecordImportJob($stub, $uploadedFile);
         QueuedJobService::singleton()->queueJob($job);
 
-        $message = _t(self::class . '.QUEUED_FOR_IMPORT', 'Queued the uploaded file for import.');
         $itemLink = $this->itemEditLink((string) ($data['GridFieldLink'] ?? ''), $stub);
 
         if ($itemLink) {
-            return $this->redirect($this->appendToast($itemLink, $message, 'Import'));
+            return $this->redirect($itemLink);
         }
 
         // Fallback for the rare case GridFieldLink wasn't usable (missing/invalid, e.g. a
         // GridField whose config doesn't route a normal item/edit URL) — back to the grid list,
         // same as before this was added.
-        return $this->redirectToReferer($message, $backURL, 'Import');
+        return $this->redirectToReferer($backURL);
     }
 
     /**
@@ -294,11 +287,6 @@ class RecordPackerController extends Controller
             && DataObject::singleton($class)->hasExtension(PackableExtension::class);
     }
 
-    private function titleFor(DataObject $record): string
-    {
-        return $record->hasField('Title') ? (string) $record->Title : ('#' . $record->ID);
-    }
-
     /**
      * Redirects to wherever the modal's form was submitted from — there's no single fixed
      * "record edit" URL the way the page tree has one. Prefers the explicit $backURL (the
@@ -309,11 +297,8 @@ class RecordPackerController extends Controller
      * extension can omit or strip it on an otherwise ordinary same-origin form POST, which
      * silently sent every export/import here back to the site root instead of the CMS.
      */
-    private function redirectToReferer(
-        ?string $toastMessage = null,
-        ?string $backURL = null,
-        ?string $toastTitle = null
-    ): HTTPResponse {
+    private function redirectToReferer(?string $backURL = null): HTTPResponse
+    {
         $link = ($backURL && Director::is_site_url($backURL)) ? $backURL : null;
 
         if (!$link) {
@@ -321,28 +306,6 @@ class RecordPackerController extends Controller
             $link = ($referer && Director::is_site_url($referer)) ? $referer : Director::absoluteBaseURL();
         }
 
-        return $this->redirect($this->appendToast($link, $toastMessage, $toastTitle));
-    }
-
-    /**
-     * Appends the toast query params export-modal.js reads and clears from the URL bar once
-     * shown. $toastTitle is the toast's header ("Export"/"Import") — left off for doExport(),
-     * whose default of "Export" (baked into export-modal.js for backwards compatibility with
-     * exports queued before this existed) is already correct.
-     */
-    private function appendToast(string $link, ?string $toastMessage, ?string $toastTitle = null): string
-    {
-        if (!$toastMessage) {
-            return $link;
-        }
-
-        $separator = str_contains($link, '?') ? '&' : '?';
-        $link .= $separator . 'page-packer-toast=' . rawurlencode($toastMessage);
-
-        if ($toastTitle) {
-            $link .= '&page-packer-toast-title=' . rawurlencode($toastTitle);
-        }
-
-        return $link;
+        return $this->redirect($link);
     }
 }

@@ -63,7 +63,6 @@ class RecordPackerControllerTest extends SapphireTest
         ], $form);
 
         $this->assertSame(302, $response->getStatusCode());
-        $this->assertStringContainsString('page-packer-toast=', $response->getHeader('Location'));
 
         $exportRequest = ExportRequest::get()->filter([
             'RecordID' => $catalogue->ID,
@@ -259,13 +258,11 @@ class RecordPackerControllerTest extends SapphireTest
 
         $this->assertSame('Importing…', $stub->Title, 'The new stub gets a placeholder Title while the job runs.');
 
-        $location = $response->getHeader('Location');
-        $this->assertStringStartsWith(
+        $this->assertSame(
             Controller::join_links($gridFieldLink, 'item', $stub->ID),
-            $location,
+            $response->getHeader('Location'),
             'Must redirect straight into the new stub\'s own edit view, not back to the grid list.'
         );
-        $this->assertStringContainsString('page-packer-toast-title=Import', $location);
     }
 
     public function testDoImportFallsBackToBackURLWithoutAGridFieldLink(): void
