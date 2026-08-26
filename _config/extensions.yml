@@ -1,0 +1,30 @@
+---
+Name: record-packer-extensions
+---
+# PackingPolicy supplies everything PackableExtension/RecordLockExtension need that varies by
+# context (permission code, job classes, where to host the export form, where the trigger is
+# placed) — see that interface's own doc comment. Registered as a named Injector service variant
+# plus a default alias, the same pattern silverstripe/versioned's own Versioned extension uses for
+# its Stage/StagedVersioned modes (versioned/_config/versionedextension.yml) — a project or
+# integration module (e.g. this module's own record-packer-pages, for SiteTree) registers its own
+# variant the same way rather than this module needing to know about it at all.
+SilverStripe\Core\Injector\Injector:
+  MadeCurious\RecordPacker\Support\PackingPolicy.record:
+    class: MadeCurious\RecordPacker\Support\RecordPackingPolicy
+  # Default: any class applying PackableExtension/RecordLockExtension without requesting a more
+  # specific variant gets the generic policy.
+  MadeCurious\RecordPacker\Support\PackingPolicy: '%$MadeCurious\RecordPacker\Support\PackingPolicy.record'
+
+# Mismatch handling for an unsupported relation/class/property
+# — 'fail' aborts an export/import with a clear error
+# - 'best_effort' skips what doesn't match and records a warning instead.
+MadeCurious\RecordPacker\Serialization\RecordSerializer:
+  mismatch_behaviour: fail
+
+# Apply RecordLockExtension + PackableExtension to any project DataObject (see the developer
+# guide) to get export/import via a GridField's own edit form. This one is applied globally and
+# unconditionally — GridFieldRecordActionsExtension itself no-ops for a record without
+# PackableExtension applied.
+SilverStripe\Forms\GridField\GridFieldDetailForm_ItemRequest:
+  extensions:
+    - MadeCurious\RecordPacker\Extensions\GridFieldRecordActionsExtension
