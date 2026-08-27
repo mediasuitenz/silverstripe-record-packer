@@ -42,7 +42,7 @@ use Throwable;
  */
 class RecordPackerController extends Controller
 {
-    private static $url_segment = 'page-packer';
+    private static $url_segment = 'record-packer';
 
     private static $allowed_actions = [
         'ExportModalForm',
