@@ -27,7 +27,7 @@ use SilverStripe\Security\Permission;
  */
 class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField_ActionProvider
 {
-    private const ACTION_NAME = 'pagepackerexport';
+    private const ACTION_NAME = 'recordpackerexport';
 
     public function augmentColumns($gridField, &$columns)
     {
@@ -94,7 +94,7 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
 
         return GridField_FormAction::create(
             $gridField,
-            'PagePackerExport' . $record->ID,
+            'RecordPackerExport' . $record->ID,
             false,
             self::ACTION_NAME,
             ['RecordID' => $record->ID]

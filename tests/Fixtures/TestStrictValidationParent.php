@@ -12,7 +12,7 @@ use SilverStripe\ORM\DataObject;
  */
 class TestStrictValidationParent extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_StrictValidationParent';
+    private static $table_name = 'RecordPacker_Test_StrictValidationParent';
 
     private static $db = [
         'Title' => 'Varchar(255)',

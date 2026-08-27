@@ -20,7 +20,7 @@ class AssetBundler
     use Injectable;
     use Configurable;
 
-    private static $import_folder = 'page-packer-imports';
+    private static $import_folder = 'record-packer-imports';
 
     /** @var array<string, array> hash => ['filename', 'mime', 'zipPath'] collected during export */
     private array $assets = [];

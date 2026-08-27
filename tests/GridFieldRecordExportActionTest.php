@@ -50,7 +50,7 @@ class GridFieldRecordExportActionTest extends SapphireTest
         $content = $component->getColumnContent($this->gridFieldFor(TestCatalogue::class), $catalogue, 'Actions');
 
         $this->assertNotNull($content);
-        $this->assertStringContainsString('id="action_PagePackerExport' . $catalogue->ID . '"', $content);
+        $this->assertStringContainsString('id="action_RecordPackerExport' . $catalogue->ID . '"', $content);
     }
 
     public function testColumnContentIsAbsentForANonPackableRecord(): void
@@ -107,7 +107,7 @@ class GridFieldRecordExportActionTest extends SapphireTest
 
         $gridField = $this->gridFieldFor(TestCatalogue::class);
         $component = new GridFieldRecordExportAction();
-        $component->handleAction($gridField, 'pagepackerexport', ['RecordID' => $catalogue->ID], []);
+        $component->handleAction($gridField, 'recordpackerexport', ['RecordID' => $catalogue->ID], []);
 
         $this->assertTrue(QueuedJobDescriptor::get()->filter([
             'Implementation' => RecordExportJob::class,
@@ -126,6 +126,6 @@ class GridFieldRecordExportActionTest extends SapphireTest
         $component = new GridFieldRecordExportAction();
 
         $this->expectException(ValidationException::class);
-        $component->handleAction($gridField, 'pagepackerexport', ['RecordID' => $catalogue->ID], []);
+        $component->handleAction($gridField, 'recordpackerexport', ['RecordID' => $catalogue->ID], []);
     }
 }

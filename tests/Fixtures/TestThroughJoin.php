@@ -13,7 +13,7 @@ use SilverStripe\ORM\DataObject;
  */
 class TestThroughJoin extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_ThroughJoin';
+    private static $table_name = 'RecordPacker_Test_ThroughJoin';
 
     private static $db = [
         'Note' => 'Varchar(255)',

@@ -85,7 +85,7 @@ class RecordPackerController extends Controller
         $form = Form::create($this, 'ExportModalForm', $fields, $actions);
         $form->setFormAction($this->Link('ExportModalForm'));
         $form->setValidationExemptActions(['doExport']);
-        $form->addExtraClass('page-packer-modal-form');
+        $form->addExtraClass('record-packer-modal-form');
 
         return $form;
     }
@@ -136,7 +136,7 @@ class RecordPackerController extends Controller
                 _t(self::class . '.IMPORT_FILE', 'Import a previously exported record (.zip)')
             )->setAllowedExtensions(['zip'])
             ->setAllowedMaxFileNumber(1)
-            ->setFolderName('page-packer-uploads')
+            ->setFolderName('record-packer-uploads')
         );
 
         $actions = FieldList::create(
@@ -148,7 +148,7 @@ class RecordPackerController extends Controller
         $form = Form::create($this, 'ImportModalForm', $fields, $actions);
         $form->setFormAction($this->Link('ImportModalForm'));
         $form->setValidationExemptActions(['doImport']);
-        $form->addExtraClass('page-packer-modal-form');
+        $form->addExtraClass('record-packer-modal-form');
 
         return $form;
     }

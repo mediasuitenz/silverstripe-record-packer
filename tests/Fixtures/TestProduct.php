@@ -11,7 +11,7 @@ use SilverStripe\ORM\DataObject;
  */
 class TestProduct extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_Product';
+    private static $table_name = 'RecordPacker_Test_Product';
 
     private static $db = [
         'Title' => 'Varchar(255)',

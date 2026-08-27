@@ -15,7 +15,7 @@ use SilverStripe\ORM\DataObject;
  */
 class TestCatalogue extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_Catalogue';
+    private static $table_name = 'RecordPacker_Test_Catalogue';
 
     private static $db = [
         'Title' => 'Varchar(255)',

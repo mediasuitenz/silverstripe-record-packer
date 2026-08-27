@@ -57,7 +57,7 @@ class RecordLockExtension extends Extension
         }
 
         $warning = LiteralField::create(
-            'PagePackerLockedWarning',
+            'RecordPackerLockedWarning',
             '<div class="alert alert-warning">' . nl2br($this->policy->lockedWarningMessage()) . '</div>'
         );
 

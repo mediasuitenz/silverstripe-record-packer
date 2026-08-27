@@ -10,7 +10,7 @@ use SilverStripe\ORM\DataObject;
  */
 class TestThroughTarget extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_ThroughTarget';
+    private static $table_name = 'RecordPacker_Test_ThroughTarget';
 
     private static $db = [
         'Title' => 'Varchar(255)',

@@ -16,7 +16,7 @@ use SilverStripe\View\Requirements;
 /**
  * An opt-in GridField toolbar component — add it to a GridFieldConfig (alongside
  * GridFieldAddNewButton) to let editors create a new record in that GridField by uploading a
- * previously exported PagePacker file. The GridField/DataObject equivalent of the page tree's
+ * previously exported record file. The GridField/DataObject equivalent of the page tree's
  * "Add new page" import option — see CMSMainAddFormImportExtension — but opt-in rather than
  * automatic, since (unlike the page tree) not every GridField is a sensible import target.
  *
@@ -64,7 +64,7 @@ class GridFieldRecordImportButton implements GridField_HTMLProvider
         $form->Fields()->dataFieldByName('GridFieldLink')->setValue($gridField->Link());
         $form->Fields()->insertAfter('ImportFile', LiteralField::create(
             'PackerImportPreview',
-            '<div id="' . $previewId . '" class="page-packer-import-preview" '
+            '<div id="' . $previewId . '" class="record-packer-import-preview" '
             . 'data-preview-url="' . htmlspecialchars($controller->Link('importPreview'), ENT_QUOTES) . '" '
             . 'data-upload-field-name="ImportFile"></div>'
         ));

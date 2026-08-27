@@ -106,6 +106,6 @@ class RecordLockExtensionTest extends SapphireTest
         // flattenFields(), not dataFieldByName() — LiteralField::hasData() is false (it's a
         // display-only banner, not a data-carrying input), so it's invisible to the latter; and
         // fieldByName() alone only recurses into nested tabs given a fully dotted path.
-        $this->assertNotNull($fields->flattenFields()->fieldByName('PagePackerLockedWarning'));
+        $this->assertNotNull($fields->flattenFields()->fieldByName('RecordPackerLockedWarning'));
     }
 }

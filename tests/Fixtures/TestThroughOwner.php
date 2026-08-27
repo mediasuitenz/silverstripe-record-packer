@@ -14,7 +14,7 @@ use SilverStripe\ORM\DataObject;
  */
 class TestThroughOwner extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_ThroughOwner';
+    private static $table_name = 'RecordPacker_Test_ThroughOwner';
 
     private static $db = [
         'Title' => 'Varchar(255)',

@@ -15,7 +15,7 @@ use SilverStripe\Versioned\Versioned;
  */
 class TestVersionedRecord extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_VersionedRecord';
+    private static $table_name = 'RecordPacker_Test_VersionedRecord';
 
     private static $db = [
         'Title' => 'Varchar(255)',

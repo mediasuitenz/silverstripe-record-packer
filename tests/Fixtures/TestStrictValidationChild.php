@@ -16,7 +16,7 @@ use SilverStripe\ORM\ValidationResult;
  */
 class TestStrictValidationChild extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_StrictValidationChild';
+    private static $table_name = 'RecordPacker_Test_StrictValidationChild';
 
     private static $db = [
         'Title' => 'Varchar(255)',

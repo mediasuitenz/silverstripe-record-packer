@@ -17,7 +17,7 @@ use SilverStripe\ORM\DataObject;
  */
 class TestHasOneOwner extends DataObject implements TestOnly
 {
-    private static $table_name = 'PagePacker_Test_HasOneOwner';
+    private static $table_name = 'RecordPacker_Test_HasOneOwner';
 
     private static $db = [
         'Title' => 'Varchar(255)',

@@ -3,8 +3,8 @@
  *
  */
 (function () {
-    if (window.__pagePackerModalReady) { return; }
-    window.__pagePackerModalReady = true;
+    if (window.__recordPackerModalReady) { return; }
+    window.__recordPackerModalReady = true;
 
     function closeModal(modalEl) {
         if (!modalEl) { return; }
@@ -12,7 +12,7 @@
         modalEl.style.display = 'none';
         modalEl.remove();
         document.body.classList.remove('modal-open');
-        document.querySelectorAll('[data-page-packer-backdrop]').forEach(function (el) {
+        document.querySelectorAll('[data-record-packer-backdrop]').forEach(function (el) {
             el.remove();
         });
     }
@@ -34,7 +34,7 @@
 
             var backdrop = document.createElement('div');
             backdrop.className = 'modal-backdrop fade show';
-            backdrop.setAttribute('data-page-packer-backdrop', '1');
+            backdrop.setAttribute('data-record-packer-backdrop', '1');
             document.body.appendChild(backdrop);
 
             modalEl.classList.add('show');
