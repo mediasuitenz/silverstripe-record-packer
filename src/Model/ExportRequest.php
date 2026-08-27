@@ -34,7 +34,7 @@ use Symbiote\QueuedJobs\DataObjects\QueuedJobDescriptor;
  */
 class ExportRequest extends DataObject
 {
-    private static $table_name = 'PagePacker_ExportRequest';
+    private static $table_name = 'RecordPacker_ExportRequest';
 
     public const STATUS_QUEUED = 'Queued';
     public const STATUS_COMPLETE = 'Complete';
