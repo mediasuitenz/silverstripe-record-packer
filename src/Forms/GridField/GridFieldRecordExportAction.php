@@ -155,16 +155,21 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
     }
 
     /**
-     * One query covering every row currently in $gridField's list: map(ID, ClassName) rather than
-     * hydrating full records (a row's actual ClassName — not just $gridField->getModelClass() —
-     * matters here, since a subclassed row's real signature is computed from its own leaf class),
-     * then one QueuedJobDescriptor lookup for all of those signatures at once.
+     * One query covering every row on the current page: map(ID, ClassName) rather than hydrating
+     * full records (a row's actual ClassName — not just $gridField->getModelClass() — matters
+     * here, since a subclassed row's real signature is computed from its own leaf class), then one
+     * QueuedJobDescriptor lookup for all of those signatures at once.
+     *
+     * Deliberately getManipulatedList(), not getList() — the latter is the raw, unpaginated list
+     * before GridFieldPaginator (or any other GridField_DataManipulator) has run; querying it
+     * directly would pull every row in the whole table on every render of a large GridField,
+     * exactly the kind of cost this batching was meant to avoid rather than reintroduce.
      *
      * @return array<string, true>
      */
     private function fetchPendingExportSignatures(GridField $gridField): array
     {
-        $classNamesByID = $gridField->getList()->map('ID', 'ClassName');
+        $classNamesByID = $gridField->getManipulatedList()->map('ID', 'ClassName');
 
         if (!count($classNamesByID)) {
             return [];
