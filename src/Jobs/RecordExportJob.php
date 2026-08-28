@@ -140,10 +140,18 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
                 return [$file, $sourceContentTimestamp];
             };
 
+            // Only switch into LIVE mode when the record has actually been published at least
+            // once — a versioned-but-never-published record (e.g. a catalogue/config record kept
+            // versioned purely for audit history, not gated behind an explicit publish step) has
+            // no Live row to read at all, so switching stage would make it look deleted instead
+            // of exporting its current (Draft) content the way an unversioned DataObject would.
+            $isPublished = DataObject::singleton($class)->hasExtension(Versioned::class)
+                && (bool) $class::get()->byID($recordID)?->isPublished();
+
             // The whole read+walk+timestamp-capture happens inside one withVersionedMode call
             // because withVersionedMode restores the prior reading mode as soon as its callback
             // returns — but only when there's a stage to switch to in the first place.
-            [$file, $sourceContentTimestamp] = DataObject::singleton($class)->hasExtension(Versioned::class)
+            [$file, $sourceContentTimestamp] = $isPublished
                 ? Versioned::withVersionedMode(function () use ($read) {
                     Versioned::set_stage(Versioned::LIVE);
 
