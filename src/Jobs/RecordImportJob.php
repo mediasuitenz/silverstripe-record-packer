@@ -2,6 +2,7 @@
 
 namespace MadeCurious\RecordPacker\Jobs;
 
+use MadeCurious\RecordPacker\Extensions\PackableExtension;
 use MadeCurious\RecordPacker\Model\ExportRequest;
 use MadeCurious\RecordPacker\Serialization\AssetBundler;
 use MadeCurious\RecordPacker\Serialization\RecordSerializer;
@@ -185,23 +186,19 @@ class RecordImportJob extends AbstractQueuedJob implements QueuedJob
             $this->addMessage($warning, 'WARNING');
         }
 
-        $exportRequest = ExportRequest::create();
-        $exportRequest->RecordID = $record->ID;
-        $exportRequest->RecordClass = get_class($record);
-        $exportRequest->MemberID = $this->memberID;
-        $exportRequest->Status = ExportRequest::STATUS_COMPLETE;
-        $exportRequest->Origin = ExportRequest::ORIGIN_IMPORT;
-        $exportRequest->ResultFileID = $uploadedFile->ID;
-        $exportRequest->IncludeAssets = $assetBundler->hasEmbeddedAssets($manifest);
-        $exportRequest->QueuedJobDescriptorID = $this->currentJobDescriptorID();
-        $exportRequest->write();
+        $this->createExportRequest(
+            $record,
+            ExportRequest::STATUS_COMPLETE,
+            $uploadedFile->ID,
+            $assetBundler->hasEmbeddedAssets($manifest)
+        );
 
         $this->addMessage("Imported record #{$record->ID} successfully.");
     }
 
     /**
-     * On failure, the stub is deliberately kept (not deleted) and, if it has a Title field,
-     * re-titled to surface the error directly when an editor opens it.
+     * On failure, the stub is deliberately kept (not deleted) and, if its own PackingPolicy gives
+     * it a display title to set, re-titled to surface the error directly when an editor opens it.
      */
     private function failStub(Throwable $e): void
     {
@@ -217,19 +214,44 @@ class RecordImportJob extends AbstractQueuedJob implements QueuedJob
             return;
         }
 
-        if ($stub->hasField('Title')) {
-            $stub->Title = 'Import failed: ' . $e->getMessage();
+        $retitled = PackableExtension::policyFor($stub)->setDisplayTitle($stub, 'Import failed: ' . $e->getMessage());
+
+        if ($retitled) {
             $stub->write();
         }
 
+        $this->createExportRequest($stub, ExportRequest::STATUS_FAILED, $this->uploadedFileID, null, $e->getMessage());
+    }
+
+    /**
+     * The ExportRequest history row doImport()/failStub() each create on completion/failure —
+     * shared here since both otherwise repeat the same 6 fields (RecordID, RecordClass, MemberID,
+     * Origin, ResultFileID, QueuedJobDescriptorID) alongside their own one or two distinguishing
+     * fields ($includeAssets on success, $statusMessage on failure).
+     */
+    private function createExportRequest(
+        DataObject $record,
+        string $status,
+        ?int $resultFileID,
+        ?bool $includeAssets = null,
+        ?string $statusMessage = null
+    ): void {
         $exportRequest = ExportRequest::create();
-        $exportRequest->RecordID = $stub->ID;
-        $exportRequest->RecordClass = get_class($stub);
+        $exportRequest->RecordID = $record->ID;
+        $exportRequest->RecordClass = get_class($record);
         $exportRequest->MemberID = $this->memberID;
-        $exportRequest->Status = ExportRequest::STATUS_FAILED;
+        $exportRequest->Status = $status;
         $exportRequest->Origin = ExportRequest::ORIGIN_IMPORT;
-        $exportRequest->StatusMessage = $e->getMessage();
-        $exportRequest->ResultFileID = $this->uploadedFileID;
+        $exportRequest->ResultFileID = $resultFileID;
+
+        if ($includeAssets !== null) {
+            $exportRequest->IncludeAssets = $includeAssets;
+        }
+
+        if ($statusMessage !== null) {
+            $exportRequest->StatusMessage = $statusMessage;
+        }
+
         $exportRequest->QueuedJobDescriptorID = $this->currentJobDescriptorID();
         $exportRequest->write();
     }
