@@ -2,6 +2,7 @@
 
 namespace MadeCurious\RecordPacker\Jobs;
 
+use MadeCurious\RecordPacker\Extensions\PackableExtension;
 use MadeCurious\RecordPacker\Model\ExportRequest;
 use MadeCurious\RecordPacker\Serialization\AssetBundler;
 use MadeCurious\RecordPacker\Serialization\ContentTimestampWalker;
@@ -13,6 +14,7 @@ use SilverStripe\ORM\DataObject;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 use SilverStripe\Versioned\Versioned;
+use SilverStripe\View\Parsers\URLSegmentFilter;
 use Symbiote\QueuedJobs\Services\AbstractQueuedJob;
 use Symbiote\QueuedJobs\Services\QueuedJob;
 use Throwable;
@@ -82,7 +84,12 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
         return md5(sprintf('%s-%s', static::signaturePrefix(), $id));
     }
 
-    private static function signatureForIdAndClass(int $id, string $className): string
+    /**
+     * Public so a caller checking many records at once (e.g. GridFieldRecordExportAction batching
+     * a whole grid's worth of pending-job signatures into one query) can compute a signature from
+     * just an ID/class pair — without needing a hydrated record instance for each one.
+     */
+    public static function signatureForIdAndClass(int $id, string $className): string
     {
         return md5(sprintf('%s-%s-%s', static::signaturePrefix(), $id, $className));
     }
@@ -188,8 +195,11 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
         $slug = $record->hasField('URLSegment') ? (string) $record->URLSegment : '';
 
         if ($slug === '') {
-            $title = $record->hasField('Title') ? (string) $record->Title : get_class($record);
-            $slug = trim((string) preg_replace('/[^A-Za-z0-9]+/', '-', $title), '-');
+            $title = PackableExtension::policyFor($record)->displayTitle($record) ?? get_class($record);
+            // Same filter SiteTree itself uses to derive URLSegment from Title — transliterates
+            // non-ASCII characters into something usable instead of just dropping them, unlike a
+            // hand-rolled [^A-Za-z0-9]+ regex.
+            $slug = (new URLSegmentFilter())->filter($title);
         }
 
         return ($slug !== '' ? $slug : 'record') . '-export.zip';
