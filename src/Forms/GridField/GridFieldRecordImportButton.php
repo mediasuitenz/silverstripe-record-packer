@@ -36,7 +36,7 @@ class GridFieldRecordImportButton implements GridField_HTMLProvider
         $modelClass = $gridField->getModelClass();
         $singleton = DataObject::singleton($modelClass);
 
-        if (!$singleton->hasExtension(PackableExtension::class)) {
+        if (!PackableExtension::appliesTo($singleton)) {
             return [];
         }
 

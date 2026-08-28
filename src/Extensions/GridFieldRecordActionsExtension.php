@@ -30,10 +30,7 @@ class GridFieldRecordActionsExtension extends Extension
     {
         $record = $this->owner->getRecord();
 
-        if (!$record instanceof DataObject
-            || !$record->exists()
-            || !$record->hasExtension(PackableExtension::class)
-        ) {
+        if (!$record instanceof DataObject || !$record->exists() || !PackableExtension::appliesTo($record)) {
             return;
         }
 

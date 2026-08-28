@@ -92,14 +92,10 @@ class RecordPackerController extends Controller
 
     public function doExport(array $data, Form $form): HTTPResponse
     {
-        if (!Permission::check(ImportExportPermissions::RECORD_IMPORT_EXPORT)) {
-            return Security::permissionFailure($this);
-        }
+        $class = $this->requirePackableClass($data);
 
-        $class = (string) ($data['RecordClassName'] ?? '');
-
-        if (!$this->isPackable($class)) {
-            return HTTPResponse::create('Not a packable record type.', 400);
+        if ($class instanceof HTTPResponse) {
+            return $class;
         }
 
         $id = (int) ($data['RecordID'] ?? 0);
@@ -155,14 +151,10 @@ class RecordPackerController extends Controller
 
     public function doImport(array $data, Form $form): HTTPResponse
     {
-        if (!Permission::check(ImportExportPermissions::RECORD_IMPORT_EXPORT)) {
-            return Security::permissionFailure($this);
-        }
+        $class = $this->requirePackableClass($data);
 
-        $class = (string) ($data['RecordClassName'] ?? '');
-
-        if (!$this->isPackable($class)) {
-            return HTTPResponse::create('Not a packable record type.', 400);
+        if ($class instanceof HTTPResponse) {
+            return $class;
         }
 
         $singleton = DataObject::singleton($class);
@@ -210,6 +202,27 @@ class RecordPackerController extends Controller
         // GridField whose config doesn't route a normal item/edit URL) — back to the grid list,
         // same as before this was added.
         return $this->redirectToReferer($backURL);
+    }
+
+    /**
+     * The guard doExport()/doImport() both start with — checks the permission, then that
+     * $data['RecordClassName'] is actually packable. Returns the validated class name on success,
+     * or the HTTPResponse the caller should return as-is on failure — check with instanceof
+     * before using the result as a class name.
+     */
+    private function requirePackableClass(array $data): string|HTTPResponse
+    {
+        if (!Permission::check(ImportExportPermissions::RECORD_IMPORT_EXPORT)) {
+            return Security::permissionFailure($this);
+        }
+
+        $class = (string) ($data['RecordClassName'] ?? '');
+
+        if (!PackableExtension::appliesTo($class)) {
+            return HTTPResponse::create('Not a packable record type.', 400);
+        }
+
+        return $class;
     }
 
     /**
@@ -272,19 +285,11 @@ class RecordPackerController extends Controller
             ]));
         }
 
-        $meta['classExists'] = $this->isPackable((string) $meta['className']);
+        $meta['classExists'] = PackableExtension::appliesTo((string) $meta['className']);
         // include "referenced" assets as per the exporter
         $meta['assetCount'] = count($manifest['assets'] ?? []);
 
         return $response->setBody(json_encode($meta));
-    }
-
-    private function isPackable(string $class): bool
-    {
-        return $class !== ''
-            && class_exists($class)
-            && is_a($class, DataObject::class, true)
-            && DataObject::singleton($class)->hasExtension(PackableExtension::class);
     }
 
     /**
