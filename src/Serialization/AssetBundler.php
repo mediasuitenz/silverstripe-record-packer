@@ -32,6 +32,14 @@ class AssetBundler
     private ?string $openZipPath = null;
 
     /**
+     * Kept open for the lifetime of this instance once readZip() is called, rather than
+     * ZipArchive::open()/close() around every individual materializeAsset()/hasEmbeddedAssets()
+     * call — an import referencing dozens of embedded files would otherwise reopen (and
+     * re-parse the central directory of) the same zip once per file.
+     */
+    private ?ZipArchive $openZip = null;
+
+    /**
      * Records that $file was referenced for inclusion in the export manifest
      */
     public function captureAsset(File $file, bool $embedBytes): string
@@ -107,6 +115,12 @@ class AssetBundler
      */
     public function readZip(File $zipFile): array
     {
+        // Close out any previously opened zip first — readZip() isn't currently called more than
+        // once per instance anywhere in this module, but guarding here (rather than only in
+        // __destruct()) means a future caller that does reuse an instance can't leak a handle or
+        // temp file.
+        $this->closeOpenZip();
+
         $this->openZipPath = tempnam(sys_get_temp_dir(), 'stie-import-');
         file_put_contents($this->openZipPath, $zipFile->getString());
 
@@ -116,8 +130,9 @@ class AssetBundler
             throw new RuntimeException('The uploaded file is not a valid zip archive.');
         }
 
+        $this->openZip = $zip;
+
         $manifestJson = $zip->getFromName('manifest.json');
-        $zip->close();
 
         if ($manifestJson === false) {
             throw new RuntimeException('The uploaded zip does not contain a manifest.json.');
@@ -178,53 +193,46 @@ class AssetBundler
     {
         $assets = (array) ($manifest['assets'] ?? []);
 
-        if (!$assets || $this->openZipPath === null) {
+        if (!$assets || $this->openZip === null) {
             return false;
         }
-
-        $zip = new ZipArchive();
-
-        if ($zip->open($this->openZipPath) !== true) {
-            return false;
-        }
-
-        $found = false;
 
         foreach ($assets as $assetInfo) {
-            if ($zip->locateName($assetInfo['zipPath'] ?? '') !== false) {
-                $found = true;
-
-                break;
+            if ($this->openZip->locateName($assetInfo['zipPath'] ?? '') !== false) {
+                return true;
             }
         }
 
-        $zip->close();
-
-        return $found;
+        return false;
     }
 
     private function readEmbeddedBytes(string $zipPath): ?string
     {
-        if ($zipPath === '' || $this->openZipPath === null) {
+        if ($zipPath === '' || $this->openZip === null) {
             return null;
         }
 
-        $zip = new ZipArchive();
-
-        if ($zip->open($this->openZipPath) !== true) {
-            return null;
-        }
-
-        $bytes = $zip->getFromName($zipPath);
-        $zip->close();
+        $bytes = $this->openZip->getFromName($zipPath);
 
         return $bytes === false ? null : $bytes;
     }
 
-    public function __destruct()
+    private function closeOpenZip(): void
     {
+        if ($this->openZip !== null) {
+            $this->openZip->close();
+            $this->openZip = null;
+        }
+
         if ($this->openZipPath && file_exists($this->openZipPath)) {
             unlink($this->openZipPath);
         }
+
+        $this->openZipPath = null;
+    }
+
+    public function __destruct()
+    {
+        $this->closeOpenZip();
     }
 }
