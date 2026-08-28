@@ -53,10 +53,16 @@ class RelationSchema
      * many_many relation NAMES excluded regardless of what class declares them or what they
      * point at — for relations that aren't sensibly identified by target class alone.
      *
+     * FileTracking is the only entry here by default: it's contributed by silverstripe/assets'
+     * own FileLinkTracking extension, a real dependency of this module. LinkTracking (SiteTree's
+     * link-tracking relation, from silverstripe/cms) deliberately isn't — this module has zero
+     * dependency on silverstripe/cms, so a SiteTree-only relation name has no business being
+     * baked into its default config; the page-tree integration module adds it via its own config
+     * merging into this array instead (see that module's RelationSchema config).
+     *
      * @var string[]
      */
     private static $excluded_relation_names = [
-        'LinkTracking',
         'FileTracking',
     ];
 
