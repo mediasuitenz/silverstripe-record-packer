@@ -131,13 +131,7 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
             $recordID = (int) $this->recordID;
             $includeAssets = (bool) $this->includeAssets;
 
-            $read = function () use ($class, $recordID, $includeAssets) {
-                $record = $class::get()->byID($recordID);
-
-                if (!$record || !$record->exists()) {
-                    throw new RuntimeException("Record #{$recordID} no longer exists.");
-                }
-
+            $export = function (DataObject $record) use ($includeAssets) {
                 $assetBundler = Injector::inst()->create(AssetBundler::class);
                 $serializer = RecordSerializer::create($assetBundler, $includeAssets);
                 $manifest = $serializer->export($record);
@@ -147,24 +141,41 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
                 return [$file, $sourceContentTimestamp];
             };
 
+            $record = $class::get()->byID($recordID);
+
+            if (!$record || !$record->exists()) {
+                throw new RuntimeException("Record #{$recordID} no longer exists.");
+            }
+
             // Only switch into LIVE mode when the record has actually been published at least
             // once — a versioned-but-never-published record (e.g. a catalogue/config record kept
             // versioned purely for audit history, not gated behind an explicit publish step) has
             // no Live row to read at all, so switching stage would make it look deleted instead
             // of exporting its current (Draft) content the way an unversioned DataObject would.
-            $isPublished = DataObject::singleton($class)->hasExtension(Versioned::class)
-                && (bool) $class::get()->byID($recordID)?->isPublished();
+            // isPublished() only needs the record's ID and checks the LIVE stage directly, so
+            // it's safe to call on this instance regardless of which mode it was fetched under.
+            $isPublished = $record->hasExtension(Versioned::class) && $record->isPublished();
 
-            // The whole read+walk+timestamp-capture happens inside one withVersionedMode call
-            // because withVersionedMode restores the prior reading mode as soon as its callback
-            // returns — but only when there's a stage to switch to in the first place.
-            [$file, $sourceContentTimestamp] = $isPublished
-                ? Versioned::withVersionedMode(function () use ($read) {
-                    Versioned::set_stage(Versioned::LIVE);
+            if (!$isPublished) {
+                [$file, $sourceContentTimestamp] = $export($record);
+            } else {
+                // Re-fetch under LIVE mode (withVersionedMode restores the prior reading mode as
+                // soon as its callback returns) so every field genuinely reflects the published
+                // row, not whatever mode the $record fetched above happened to be read under.
+                [$file, $sourceContentTimestamp] = Versioned::withVersionedMode(
+                    function () use ($class, $recordID, $export) {
+                        Versioned::set_stage(Versioned::LIVE);
 
-                    return $read();
-                })
-                : $read();
+                        $liveRecord = $class::get()->byID($recordID);
+
+                        if (!$liveRecord || !$liveRecord->exists()) {
+                            throw new RuntimeException("Record #{$recordID} no longer exists.");
+                        }
+
+                        return $export($liveRecord);
+                    }
+                );
+            }
 
             $exportRequest->Status = ExportRequest::STATUS_COMPLETE;
             $exportRequest->ResultFileID = $file->ID;
