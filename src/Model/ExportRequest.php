@@ -3,7 +3,6 @@
 namespace MadeCurious\RecordPacker\Model;
 
 use MadeCurious\RecordPacker\Extensions\PackableExtension;
-use MadeCurious\RecordPacker\Security\ImportExportPermissions;
 use MadeCurious\RecordPacker\Serialization\ContentTimestampWalker;
 use SilverStripe\Assets\File;
 use SilverStripe\Control\Controller;
@@ -122,23 +121,15 @@ class ExportRequest extends DataObject
      * Resolved from the record's own {@see PackableExtension} — whichever {@see PackingPolicy}
      * variant it was configured with (the default, or e.g. SiteTree's) is what actually decides
      * this, so this class has no need to (and, for a clean core/SiteTree-integration split,
-     * mustn't) re-derive that decision itself by checking the record's class directly. Falls back
-     * to the default policy's own code if the class no longer has PackableExtension applied at
-     * all — e.g. a still-installed but no-longer-packable class, for an old ExportRequest row.
+     * mustn't) re-derive that decision itself by checking the record's class directly.
+     * {@see PackableExtension::policyFor()} already falls back to the default policy's own code
+     * if the class no longer has PackableExtension applied at all — e.g. a still-installed but
+     * no-longer-packable class, for an old ExportRequest row — which happens to be the same
+     * ImportExportPermissions::RECORD_IMPORT_EXPORT code this used to fall back to directly.
      */
     private function permissionCode(): string
     {
-        $class = $this->RecordClass;
-
-        if ($class && class_exists($class) && is_a($class, DataObject::class, true)) {
-            $extension = DataObject::singleton($class)->getExtensionInstance(PackableExtension::class);
-
-            if ($extension) {
-                return $extension->policy()->permissionCode();
-            }
-        }
-
-        return ImportExportPermissions::RECORD_IMPORT_EXPORT;
+        return PackableExtension::policyFor((string) $this->RecordClass)->permissionCode();
     }
 
     /**
@@ -150,11 +141,20 @@ class ExportRequest extends DataObject
      */
     public function isStale(): bool
     {
+        return $this->isStaleForTimestamp($this->latestRecordTimestamp());
+    }
+
+    /**
+     * {@see isStale()}'s comparison, split out so a caller that already knows the record's latest
+     * content timestamp — e.g. {@see ExportHistoryField} computing it once per distinct record
+     * rather than once per history row — can skip repeating {@see latestRecordTimestamp()}'s
+     * relation-graph walk for every row that shares the same RecordClass/RecordID.
+     */
+    public function isStaleForTimestamp(?string $currentTimestamp): bool
+    {
         if (!$this->RecordID || !$this->RecordClass) {
             return false;
         }
-
-        $currentTimestamp = $this->latestRecordTimestamp();
 
         if ($currentTimestamp === null) {
             // Never published/created (or since removed)
@@ -170,7 +170,13 @@ class ExportRequest extends DataObject
         return $currentTimestamp > $this->SourceContentTimestamp;
     }
 
-    private function latestRecordTimestamp(): ?string
+    /**
+     * The most recent LastEdited found across the record and everything it owns, right now —
+     * public so a caller rendering several ExportRequests for the same record (see
+     * {@see ExportHistoryField}) can compute this once and reuse it via
+     * {@see isStaleForTimestamp()}/{@see staleBadgeForTimestamp()} rather than once per row.
+     */
+    public function latestRecordTimestamp(): ?string
     {
         $class = $this->RecordClass;
 
@@ -214,7 +220,16 @@ class ExportRequest extends DataObject
 
     public function getStaleBadge(): string
     {
-        return $this->isStale()
+        return $this->staleBadgeForTimestamp($this->latestRecordTimestamp());
+    }
+
+    /**
+     * {@see getStaleBadge()}, given an already-computed timestamp — see
+     * {@see isStaleForTimestamp()}'s own doc comment for why this split exists.
+     */
+    public function staleBadgeForTimestamp(?string $currentTimestamp): string
+    {
+        return $this->isStaleForTimestamp($currentTimestamp)
             ? '<span class="badge badge-warning">' . _t(self::class . '.STALE', 'Stale') . '</span>'
             : '<span class="badge badge-success">' . _t(self::class . '.FRESH', 'Fresh') . '</span>';
     }

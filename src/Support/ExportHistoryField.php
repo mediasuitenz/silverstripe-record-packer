@@ -28,9 +28,24 @@ final class ExportHistoryField
         $config = GridFieldConfig_Base::create();
         $config->addComponent(GridFieldDeleteAction::create());
 
+        // Every row in this GridField shares the same owning record, so latestRecordTimestamp()'s
+        // relation-graph walk only needs to run once per distinct RecordClass/RecordID — not once
+        // per row — even though this list can (via a shared table/polymorphic Record relation, in
+        // principle) span more than one. Scoped to this closure's own lifetime rather than a
+        // static cache, so it never outlives this one GridField render.
+        $timestampCache = [];
+
         // using setFieldFormatting() to ensure we get rendered HTML
         $config->getComponentByType(GridFieldDataColumns::class)->setFieldFormatting([
-            'StaleBadge' => fn ($value, $item) => $item->StaleBadge,
+            'StaleBadge' => function ($value, $item) use (&$timestampCache) {
+                $key = $item->RecordClass . ':' . $item->RecordID;
+
+                if (!array_key_exists($key, $timestampCache)) {
+                    $timestampCache[$key] = $item->latestRecordTimestamp();
+                }
+
+                return $item->staleBadgeForTimestamp($timestampCache[$key]);
+            },
             'StatusLinkHtml' => fn ($value, $item) => $item->StatusLinkHtml,
             'DownloadLinkHtml' => fn ($value, $item) => $item->DownloadLinkHtml,
             'IncludeAssets' => fn ($value, $item) => $item->IncludeAssets ? 'Yes' : 'No',
