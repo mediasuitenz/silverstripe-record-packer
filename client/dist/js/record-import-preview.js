@@ -70,7 +70,12 @@
 
     function checkContainer(container) {
         var fieldName = container.getAttribute('data-upload-field-name');
-        var input = document.querySelector('input[name="' + fieldName + '[Files][]"]');
+        // Scoped to the container's own modal (not the whole document) so two packable
+        // GridFields' import modals open at once don't read each other's uploaded file — every
+        // modal renders the same field name ("ImportFile"), disambiguated only by which modal
+        // it lives inside.
+        var scope = container.closest('.modal') || document;
+        var input = scope.querySelector('input[name="' + fieldName + '[Files][]"]');
         var fileId = input ? input.value : null;
         var lastSeen = lastSeenFileIds.get(container) || null;
 
