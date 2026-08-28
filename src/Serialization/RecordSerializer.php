@@ -483,10 +483,24 @@ class RecordSerializer
         foreach ((array) ($node['hasOne'] ?? []) as $relationName => $ref) {
             $target = $this->resolveReference($ref);
             $record->setComponent($relationName, $target);
+            // Unlike assetHasOne above, $changed must be set even when $target is null: a
+            // has_one that failed to resolve (e.g. an external/unresolvable reference) still
+            // needs pass 2's real, validated write to run so a project's validate() can catch a
+            // required relation that's still missing — see
+            // ImportValidationOrderingTest::testValidationIsStillEnforcedOnceRelationsAreApplied().
             $changed = true;
         }
 
         foreach ((array) ($node['manyMany'] ?? []) as $relationName => $refs) {
+            if (!array_key_exists($relationName, $record->manyMany())) {
+                $this->flagMismatch(
+                    "Relation \"{$record->ClassName}.{$relationName}\" no longer exists on this site; its"
+                    . ' associations were skipped.'
+                );
+
+                continue;
+            }
+
             $list = $record->{$relationName}();
             $list->removeAll();
 
