@@ -315,7 +315,13 @@ class RecordSerializer
         $filesByID = [];
 
         foreach (File::get()->filter(['ID' => $ids]) as $file) {
-            $filesByID[$file->ID] = $file;
+            // exists() (not just a hydrated DB row) also verifies the physical asset is actually
+            // present on the storage backend — an orphaned File row whose file was deleted is a
+            // routine real-world state, not an edge case; see captureAssetReference()'s own
+            // identical guard for the has_one path.
+            if ($file->exists()) {
+                $filesByID[$file->ID] = $file;
+            }
         }
 
         $assetKeys = [];
