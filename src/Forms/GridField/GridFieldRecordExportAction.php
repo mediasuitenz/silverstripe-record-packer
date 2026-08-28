@@ -13,6 +13,8 @@ use SilverStripe\Forms\GridField\GridField_ColumnProvider;
 use SilverStripe\Forms\GridField\GridField_FormAction;
 use SilverStripe\ORM\ValidationException;
 use SilverStripe\Security\Permission;
+use Symbiote\QueuedJobs\DataObjects\QueuedJobDescriptor;
+use Symbiote\QueuedJobs\Services\QueuedJob;
 
 /**
  * An optional, opt-in GridField per-row action — add it to a GridFieldConfig (alongside
@@ -28,6 +30,17 @@ use SilverStripe\Security\Permission;
 class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField_ActionProvider
 {
     private const ACTION_NAME = 'recordpackerexport';
+
+    /**
+     * Set of RecordExportJob signatures currently queued/running, lazily built once per GridField
+     * render (one query covering every row's signature) rather than firing RecordLockExtension's
+     * own pendingJobExists() query for every row — see {@see hasPendingExport()}'s own doc
+     * comment. Scoped to this component instance's own lifetime, which SilverStripe's usual
+     * "build a fresh GridFieldConfig per GridField" convention keeps tied to one render.
+     *
+     * @var array<string, true>|null
+     */
+    private ?array $pendingExportSignatures = null;
 
     public function augmentColumns($gridField, &$columns)
     {
@@ -75,7 +88,7 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
             return;
         }
 
-        if (!$this->canExport($record)) {
+        if (!$this->canExport($gridField, $record)) {
             throw new ValidationException(
                 _t(self::class . '.EXPORT_PERMISSION_FAILURE', 'No permission to export this record')
             );
@@ -86,7 +99,7 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
 
     private function getExportAction(GridField $gridField, $record): ?GridField_FormAction
     {
-        if (!$this->canExport($record)) {
+        if (!$this->canExport($gridField, $record)) {
             return null;
         }
 
@@ -105,9 +118,9 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
             ->setAttribute('aria-label', $title);
     }
 
-    private function canExport($record): bool
+    private function canExport(GridField $gridField, $record): bool
     {
-        if (!$record->hasExtension(PackableExtension::class)) {
+        if (!PackableExtension::appliesTo($record)) {
             return false;
         }
 
@@ -119,12 +132,61 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
             return false;
         }
 
-        if ($record->hasExtension(RecordLockExtension::class)
-            && $record->pendingJobExists([RecordExportJob::class])
-        ) {
+        if ($record->hasExtension(RecordLockExtension::class) && $this->hasPendingExport($gridField, $record)) {
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Whether $record already has a queued/running RecordExportJob — batched once per GridField
+     * render (one query covering every row's signature) rather than RecordLockExtension's own
+     * pendingJobExists() firing its own SELECT for every row, purely to decide whether to grey
+     * out this column's icon.
+     */
+    private function hasPendingExport(GridField $gridField, $record): bool
+    {
+        if ($this->pendingExportSignatures === null) {
+            $this->pendingExportSignatures = $this->fetchPendingExportSignatures($gridField);
+        }
+
+        return isset($this->pendingExportSignatures[RecordExportJob::signatureForRecord($record)]);
+    }
+
+    /**
+     * One query covering every row currently in $gridField's list: map(ID, ClassName) rather than
+     * hydrating full records (a row's actual ClassName — not just $gridField->getModelClass() —
+     * matters here, since a subclassed row's real signature is computed from its own leaf class),
+     * then one QueuedJobDescriptor lookup for all of those signatures at once.
+     *
+     * @return array<string, true>
+     */
+    private function fetchPendingExportSignatures(GridField $gridField): array
+    {
+        $classNamesByID = $gridField->getList()->map('ID', 'ClassName');
+
+        if (!count($classNamesByID)) {
+            return [];
+        }
+
+        $signatures = [];
+
+        foreach ($classNamesByID as $id => $className) {
+            $signatures[] = RecordExportJob::signatureForIdAndClass((int) $id, $className);
+        }
+
+        $pendingSignatures = QueuedJobDescriptor::get()->filter([
+            'Implementation' => RecordExportJob::class,
+            'Signature' => $signatures,
+            'JobStatus' => [
+                QueuedJob::STATUS_NEW,
+                QueuedJob::STATUS_INIT,
+                QueuedJob::STATUS_RUN,
+                QueuedJob::STATUS_WAIT,
+            ],
+        ])->column('Signature');
+
+        return array_fill_keys($pendingSignatures, true);
     }
 }
