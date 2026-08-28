@@ -10,6 +10,7 @@ use SilverStripe\Core\Extension;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\LiteralField;
+use SilverStripe\ORM\DataObject;
 use SilverStripe\Security\Permission;
 use SilverStripe\View\Requirements;
 
@@ -42,6 +43,58 @@ class PackableExtension extends Extension
         parent::__construct();
 
         $this->policy = $policy ?? Injector::inst()->get(PackingPolicy::class);
+    }
+
+    /**
+     * Whether $classOrRecord is packable — the single definition backing every "is this a
+     * packable DataObject" check across the module, replacing what used to be four independently
+     * hand-rolled variants (RecordPackerController::isPackable(), GridFieldRecordImportButton,
+     * GridFieldRecordExportAction::canExport(), GridFieldRecordActionsExtension) with differing
+     * defensiveness (a class-name string from request data needs class_exists()/is_a() guards
+     * an already-resolved record instance doesn't).
+     *
+     * @param DataObject|string $classOrRecord A record instance, or a class name (validated
+     *     before use — safe to pass an untrusted string, e.g. straight from request data).
+     */
+    public static function appliesTo($classOrRecord): bool
+    {
+        if ($classOrRecord instanceof DataObject) {
+            return $classOrRecord->hasExtension(self::class);
+        }
+
+        $class = (string) $classOrRecord;
+
+        return $class !== ''
+            && class_exists($class)
+            && is_a($class, DataObject::class, true)
+            && DataObject::singleton($class)->hasExtension(self::class);
+    }
+
+    /**
+     * Resolves $classOrRecord's own PackingPolicy variant — whichever one it was actually
+     * configured with (the default, or e.g. SiteTree's) — via its PackableExtension instance,
+     * falling back to the default policy if the class/record no longer has PackableExtension
+     * applied at all (e.g. a still-installed but no-longer-packable class, for an old
+     * ExportRequest history row). Static, so code with only a class name in hand — not a live
+     * extension instance — doesn't need to re-derive "is this SiteTree or not" itself; see
+     * {@see \MadeCurious\RecordPacker\Model\ExportRequest::permissionCode()} for the original
+     * motivating case this generalises.
+     *
+     * @param DataObject|string $classOrRecord
+     */
+    public static function policyFor($classOrRecord): PackingPolicy
+    {
+        $class = $classOrRecord instanceof DataObject ? get_class($classOrRecord) : (string) $classOrRecord;
+
+        if ($class !== '' && class_exists($class) && is_a($class, DataObject::class, true)) {
+            $extension = DataObject::singleton($class)->getExtensionInstance(self::class);
+
+            if ($extension) {
+                return $extension->policy();
+            }
+        }
+
+        return Injector::inst()->get(PackingPolicy::class);
     }
 
     /**

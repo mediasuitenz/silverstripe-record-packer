@@ -70,4 +70,22 @@ interface PackingPolicy
      * would just duplicate it.
      */
     public function showsHistoryFieldInline(): bool;
+
+    /**
+     * $record's own human-readable display title, or null if it has none — "Title" is a
+     * near-universal convention across both generic DataObjects and SiteTree, but not a
+     * guaranteed one; this is the seam an integration whose records use a different convention
+     * (e.g. Name, Label, or a computed accessor) can override, rather than the generic engine
+     * hardcoding a field name in multiple places (the manifest meta block, export filename slug
+     * generation).
+     */
+    public function displayTitle(DataObject $record): ?string;
+
+    /**
+     * Sets $record's display title to $value, returning whether anything was actually changed —
+     * a record type with no display title concept at all is a no-op. Used to surface an error
+     * message directly on a failed import's stub record (see RecordImportJob::failStub())
+     * without that generic engine code needing to know what field, if any, this record type uses.
+     */
+    public function setDisplayTitle(DataObject $record, string $value): bool;
 }

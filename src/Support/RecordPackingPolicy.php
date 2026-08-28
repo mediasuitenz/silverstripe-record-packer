@@ -78,4 +78,20 @@ class RecordPackingPolicy implements PackingPolicy
     {
         return true;
     }
+
+    public function displayTitle(DataObject $record): ?string
+    {
+        return $record->hasField('Title') ? (string) $record->Title : null;
+    }
+
+    public function setDisplayTitle(DataObject $record, string $value): bool
+    {
+        if (!$record->hasField('Title')) {
+            return false;
+        }
+
+        $record->Title = $value;
+
+        return true;
+    }
 }
