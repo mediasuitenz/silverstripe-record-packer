@@ -2,6 +2,7 @@
 
 namespace MadeCurious\RecordPacker\Serialization;
 
+use MadeCurious\RecordPacker\Extensions\PackableExtension;
 use RuntimeException;
 use SilverStripe\Assets\File;
 use SilverStripe\Core\Config\Configurable;
@@ -88,12 +89,14 @@ class RecordSerializer
             'format' => 1,
             'rootLocalId' => $rootLocalId,
             // meta populates the preview on import so we don't have to unzip first. title/
-            // urlSegment are both genuinely optional — Title is a near-universal convention but
-            // not guaranteed, and URLSegment is a SiteTree-only concept this otherwise-generic
-            // class has no business assuming exists on an arbitrary DataObject.
+            // urlSegment are both genuinely optional: title is resolved via the record's own
+            // PackingPolicy (see PackingPolicy::displayTitle()'s own doc comment for why that's
+            // the seam rather than this otherwise-generic class hardcoding a field name), while
+            // urlSegment is a SiteTree-only concept this class has no business assuming exists on
+            // an arbitrary DataObject at all — no PackingPolicy hook for it, just a direct check.
             'meta' => [
                 'className' => $record->ClassName,
-                'title' => $record->hasField('Title') ? $record->Title : null,
+                'title' => PackableExtension::policyFor($record)->displayTitle($record),
                 'urlSegment' => $record->hasField('URLSegment') ? $record->URLSegment : null,
             ],
             'nodes' => $this->nodes,
@@ -299,13 +302,28 @@ class RecordSerializer
 
     private function captureShortcodeAssets(string $htmlValue): array
     {
-        $scanner = new ContentShortcodeScanner();
+        $references = (new ContentShortcodeScanner())->extractReferences($htmlValue);
+
+        if (!$references) {
+            return [];
+        }
+
+        // One batched lookup covering every reference in this field, rather than a separate
+        // File::get()->byID() per shortcode — a field embedding dozens of images would otherwise
+        // fire dozens of individual SELECTs.
+        $ids = array_unique(array_column($references, 'id'));
+        $filesByID = [];
+
+        foreach (File::get()->filter(['ID' => $ids]) as $file) {
+            $filesByID[$file->ID] = $file;
+        }
+
         $assetKeys = [];
 
-        foreach ($scanner->extractReferences($htmlValue) as $reference) {
-            $file = File::get()->byID($reference['id']);
+        foreach ($references as $reference) {
+            $file = $filesByID[$reference['id']] ?? null;
 
-            if (!$file || !$file->exists()) {
+            if (!$file) {
                 continue;
             }
 
