@@ -7,8 +7,6 @@ use SilverStripe\ORM\DataObject;
 
 /**
  * Finds the most recent LastEdited across a page and everything it owns for staleness detection.
- *
- * Callers are responsible for the Versioned reading mode
  */
 class ContentTimestampWalker
 {

@@ -39,9 +39,6 @@ class AssetBundler
      */
     private ?ZipArchive $openZip = null;
 
-    /**
-     * Records that $file was referenced for inclusion in the export manifest
-     */
     public function captureAsset(File $file, bool $embedBytes): string
     {
         $hash = $file->getHash();
@@ -108,17 +105,9 @@ class AssetBundler
         return $file;
     }
 
-    /**
-     * Opens an uploaded export zip and returns its decoded manifest. Must be called before any
-     * {@see materializeAsset()} call against the same manifest, since asset bytes are read
-     * lazily from the opened zip on demand.
-     */
     public function readZip(File $zipFile): array
     {
-        // Close out any previously opened zip first — readZip() isn't currently called more than
-        // once per instance anywhere in this module, but guarding here (rather than only in
-        // __destruct()) means a future caller that does reuse an instance can't leak a handle or
-        // temp file.
+        // Close out any opened zip first - means a future caller can't leak a temp file.
         $this->closeOpenZip();
 
         $this->openZipPath = tempnam(sys_get_temp_dir(), 'stie-import-');
@@ -185,10 +174,6 @@ class AssetBundler
         return $file;
     }
 
-    /**
-     * Whether the opened zip (see {@see readZip()}) actually contains embedded bytes for any of
-     * the manifest's referenced assets
-     */
     public function hasEmbeddedAssets(array $manifest): bool
     {
         $assets = (array) ($manifest['assets'] ?? []);

@@ -4,12 +4,6 @@ namespace MadeCurious\RecordPacker\Security;
 
 use SilverStripe\Security\PermissionProvider;
 
-/**
- * Gates PackableExtension/RecordPackerController for a plain project DataObject —
- * madecurious/silverstripe-page-packer registers its own SiteTreeImportExportPermissions
- * alongside this one, so a group can be granted export/import on generic records without also
- * being granted it on pages (or vice versa).
- */
 class ImportExportPermissions implements PermissionProvider
 {
     const RECORD_IMPORT_EXPORT = 'RECORD_IMPORT_EXPORT';

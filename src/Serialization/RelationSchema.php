@@ -9,8 +9,7 @@ use SilverStripe\ORM\DataObjectSchema;
 
 /**
  * Shared relation/field classification rules used by {@see RecordSerializer}'s export and
- * import directions, so the two stay in lockstep about what counts as a plain scalar
- * field, an asset relation, an in-scope object-graph relation, or something to leave alone.
+ * import directions, so the two stay in lockstep
  */
 class RelationSchema
 {
@@ -20,7 +19,7 @@ class RelationSchema
      * $db field names that are never exported as plain scalar fields, either because they're
      * managed entirely by the ORM/Versioned on write (ID, ClassName, Created, LastEdited,
      * Version) or because they're the raw column behind a has_one relation, which is handled
-     * separately via {@see hasOneRelations()} instead of being dumped as a bare integer.
+     * separately via {@see hasOneRelations()}
      *
      * @var string[]
      */
@@ -36,12 +35,7 @@ class RelationSchema
 
     /**
      * DataObject classes that are never walked into via has_one/has_many/many_many, regardless
-     * of the relation name pointing at them. Only this module's own ExportRequest by default —
-     * a record's own has_many to its export history must never be treated as ordinary owned
-     * content, or the exporter would recurse into ExportRequest's own Member/ResultFile
-     * relations. A project or integration module (e.g. this module's own page-tree integration,
-     * for UserForms' visitor submission data) adds its own entries via config merging rather
-     * than this class needing to know about them.
+     * of the relation name pointing at them. Add via config if needed
      *
      * @var string[]
      */
@@ -50,15 +44,10 @@ class RelationSchema
     ];
 
     /**
-     * many_many relation NAMES excluded regardless of what class declares them or what they
-     * point at — for relations that aren't sensibly identified by target class alone.
+     * many_many relation names excluded
      *
      * FileTracking is the only entry here by default: it's contributed by silverstripe/assets'
-     * own FileLinkTracking extension, a real dependency of this module. LinkTracking (SiteTree's
-     * link-tracking relation, from silverstripe/cms) deliberately isn't — this module has zero
-     * dependency on silverstripe/cms, so a SiteTree-only relation name has no business being
-     * baked into its default config; the page-tree integration module adds it via its own config
-     * merging into this array instead (see that module's RelationSchema config).
+     * own FileLinkTracking extension
      *
      * @var string[]
      */
@@ -68,14 +57,7 @@ class RelationSchema
 
     /**
      * Per-class has_one relation names that represent the record's position in some structure
-     * managed entirely outside this module (e.g. a SiteTree page's own $has_one['Parent'] — its
-     * position in the CMS page tree, handled by the tree UI itself) rather than ordinary owned/
-     * referenced content. Excluded from {@see hasOneRelations()} the same way an excluded target
-     * class is, but keyed by relation name against a specific class rather than by target class,
-     * since e.g. 'Parent' is a perfectly ordinary content relation on plenty of other models.
-     *
-     * Empty by default — this module's own SiteTree integration populates the SiteTree entry via
-     * its own config (see that integration's docs), core has no opinion about SiteTree at all.
+     * managed entirely outside this module. Essentially a placeholder for SiteTree to use
      *
      * @var array<string, string|string[]> class => relation name(s) to treat as structural
      */
@@ -91,10 +73,6 @@ class RelationSchema
         $schema = DataObject::getSchema();
         $fields = $schema->fieldSpecs($class, DataObjectSchema::DB_ONLY);
 
-        // Strip every has_one FK column using the RAW declared list, not hasOneRelations()'s
-        // filtered one — an excluded/asset/tree-position has_one is still a relation column, not
-        // a plain field, and must never fall through to being re-applied on import as a bare,
-        // unresolved integer (see hasOneRelations()'s own doc comment).
         foreach (array_keys(DataObject::singleton($class)->hasOne()) as $relationName) {
             unset($fields["{$relationName}ID"]);
         }
@@ -107,12 +85,7 @@ class RelationSchema
     }
 
     /**
-     * has_one relations declared on $class (own + inherited, incl. via applied extensions),
-     * excluding relations to File/Image (those are asset relations) and to any class listed in
-     * $excluded_relation_classes — an excluded target is dropped from the relation graph
-     * entirely, the same as it is for has_many/many_many, rather than still being captured as a
-     * reference that (for a genuinely per-environment target, the reason it was excluded in the
-     * first place) can only ever mismatch on import.
+     * has_one relations declared on $class
      *
      * @return array<string, string> relationName => target class (DataObject::class for
      *     polymorphic relations, resolved per-row at read time)
@@ -142,12 +115,7 @@ class RelationSchema
     }
 
     /**
-     * Whether $relationName on $class is managed entirely outside this module's object graph —
-     * e.g. SiteTree's own $has_one['Parent'], which represents a page's position in the CMS page
-     * tree (handled by the tree UI itself, not ordinary content) rather than owned/referenced
-     * content. Empty by default; a project or integration registers entries here via
-     * $structural_has_one_relations when it has a class with a has_one like this — see that
-     * config's own doc comment.
+     * Whether $relationName on $class is managed entirely outside this module's object graph
      */
     private static function isStructuralRelation(string $class, string $relationName): bool
     {
@@ -224,14 +192,7 @@ class RelationSchema
      * many_many/belongs_many_many relations declared on $class that should be walked as owned
      * content. Relations using `many_many_extraFields` or a `through` join object are reported
      * back separately (in $unsupported) rather than silently dropped, so callers can honour the
-     * fail/best-effort mismatch config rather than losing extra-field/join data quietly — UNLESS
-     * a `through` relation's actual target class is itself excluded (see isExcludedClass()), in
-     * which case it's skipped silently just like any other excluded relation, rather than being
-     * reported as an unconditional failure regardless of what it points at. This matters because
-     * a project may have entirely legitimate reasons to exclude a class that happens to only be
-     * reachable via a `through` relation — e.g. real per-environment transactional/PII data that
-     * a `through` join was used to model in the first place (a workflow-status field on the join
-     * row, say) is exactly the shape of content that most needs excluding, not a fatal mismatch.
+     * fail/best-effort mismatch config rather than losing extra-field/join data silently
      *
      * @param array $unsupported Populated with relationName => reason for anything skipped
      * @return array<string, string> relationName => target class
@@ -248,11 +209,9 @@ class RelationSchema
             }
 
             if (is_array($targetClass)) {
-                // 'through' many_many: resolve the actual target class via the schema (the raw
-                // $targetClass here is just ['through' => JoinClass, 'from' => ..., 'to' => ...],
-                // not a class name) rather than trusting the raw spec, so an excluded target is
-                // recognised as such before falling through to the unconditional "unsupported"
-                // report below.
+                // 'through' many_many: resolve the actual target class via the schema rather than
+                // trusting the raw spec, so an excluded target is recognised before falling through
+                // to the unconditional "unsupported" report below.
                 $resolvedTarget = $schema->manyManyComponent($class, $name)['childClass'] ?? null;
 
                 if ($resolvedTarget && static::isExcludedClass($resolvedTarget)) {

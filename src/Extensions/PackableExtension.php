@@ -16,19 +16,12 @@ use SilverStripe\View\Requirements;
 
 /**
  * Apply this (plus {@see RecordLockExtension}) to a project DataObject to get an "Export"
- * button + export history. `SiteTree` gets exactly the same capability by applying the very
- * same two extension classes — see this module's `_config/extensions.yml` — just wired to the
- * `.sitetree` {@see PackingPolicy} Injector variant instead of the default one, rather than via
- * a SiteTree-specific subclass of this class. See {@see PackingPolicy}'s own doc comment for why
- * that's the idiom used here (it mirrors `silverstripe/versioned`'s own `Versioned` extension).
+ * button + export history.
  *
  * Two hosting contexts are supported:
- * - A record with its own LeftAndMain-style getCMSActions() (rare for a plain DataObject, but
- *   the same shape SiteTree/CMSMain uses) gets the trigger via updateCMSActions() below.
- * - A record edited through an ordinary GridField (the common case — see the developer guide)
- *   instead gets it via {@see GridFieldRecordActionsExtension}, which calls addExportTrigger()
- *   directly, because GridFieldDetailForm_ItemRequest builds its action bar itself and never
- *   calls DataObject::getCMSActions() at all.
+ * - A record with its own LeftAndMain-style getCMSActions() via updateCMSActions() below.
+ * - A record edited through an ordinary GridField gets it via {@see GridFieldRecordActionsExtension},
+ *   which calls addExportTrigger() directly
  */
 class PackableExtension extends Extension
 {
@@ -46,15 +39,8 @@ class PackableExtension extends Extension
     }
 
     /**
-     * Whether $classOrRecord is packable — the single definition backing every "is this a
-     * packable DataObject" check across the module, replacing what used to be four independently
-     * hand-rolled variants (RecordPackerController::isPackable(), GridFieldRecordImportButton,
-     * GridFieldRecordExportAction::canExport(), GridFieldRecordActionsExtension) with differing
-     * defensiveness (a class-name string from request data needs class_exists()/is_a() guards
-     * an already-resolved record instance doesn't).
      *
-     * @param DataObject|string $classOrRecord A record instance, or a class name (validated
-     *     before use — safe to pass an untrusted string, e.g. straight from request data).
+     * @param DataObject|string $classOrRecord A record instance, or a class name
      */
     public static function appliesTo($classOrRecord): bool
     {
@@ -71,14 +57,9 @@ class PackableExtension extends Extension
     }
 
     /**
-     * Resolves $classOrRecord's own PackingPolicy variant — whichever one it was actually
-     * configured with (the default, or e.g. SiteTree's) — via its PackableExtension instance,
+     * Resolves $classOrRecord's own PackingPolicy variant via its PackableExtension instance,
      * falling back to the default policy if the class/record no longer has PackableExtension
-     * applied at all (e.g. a still-installed but no-longer-packable class, for an old
-     * ExportRequest history row). Static, so code with only a class name in hand — not a live
-     * extension instance — doesn't need to re-derive "is this SiteTree or not" itself; see
-     * {@see \MadeCurious\RecordPacker\Model\ExportRequest::permissionCode()} for the original
-     * motivating case this generalises.
+     * applied at all
      *
      * @param DataObject|string $classOrRecord
      */
@@ -97,13 +78,6 @@ class PackableExtension extends Extension
         return Injector::inst()->get(PackingPolicy::class);
     }
 
-    /**
-     * Public so code that only has a class name — not a live extension instance — can still
-     * resolve the right policy for it via {@see \SilverStripe\ORM\DataObject::singleton()}'s
-     * extension instances, rather than re-deriving "is this SiteTree or not" itself. See
-     * {@see \MadeCurious\RecordPacker\Model\ExportRequest::permissionCode()} for the motivating
-     * case: a stored history row that's outlived any live context for the record it's about.
-     */
     public function policy(): PackingPolicy
     {
         return $this->policy;
@@ -111,9 +85,6 @@ class PackableExtension extends Extension
 
     public function updateCMSFields(FieldList $fields): void
     {
-        // hide the raw auto-scaffolded relation field — an editor sees this history through a
-        // properly formatted GridField instead, either inline here (see below) or, for a
-        // SiteTree page, its own dedicated "Content Export" tab.
         $fields->removeByName('ExportRequests');
 
         if (!$this->policy->showsHistoryFieldInline()) {
@@ -140,13 +111,7 @@ class PackableExtension extends Extension
     }
 
     /**
-     * Builds the "Export" trigger button (carrying the whole modal as a `data-modal` HTML
-     * string) and places it onto $actions — unless the current member lacks permission, the
-     * record hasn't been saved yet, an export/import for it is already in flight, or (for a
-     * SiteTree page) no CMSMain-hosted form is available to build.
-     *
-     * Public (rather than folded into updateCMSActions()) so GridFieldRecordActionsExtension can
-     * call it directly against the same extension instance already attached to the record.
+     * Builds the "Export" trigger button and places it onto $actions
      */
     public function addExportTrigger(FieldList $actions): void
     {
@@ -171,8 +136,6 @@ class PackableExtension extends Extension
             return;
         }
 
-        // Reused as-is: this modal's open/close behaviour is generic (keyed off
-        // data-toggle="modal"/data-modal), nothing SiteTree-specific about it.
         Requirements::javascript('madecurious/silverstripe-record-packer: client/dist/js/export-modal.js');
 
         $modalId = 'PackerExportModal' . $this->owner->ID;

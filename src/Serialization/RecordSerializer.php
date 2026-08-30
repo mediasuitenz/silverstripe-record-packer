@@ -10,24 +10,18 @@ use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\ORM\DataObject;
 
 /**
- * Exports a single DataObject — a SiteTree page, or any other project DataObject with
- * {@see \MadeCurious\RecordPacker\Extensions\PackableExtension} applied — into a flat,
- * serializable node graph, and reverses that same graph back into real records on import.
- * Despite living in a module that started out page-only, nothing in here is SiteTree-specific:
- * it walks whatever `$has_one`/`$has_many`/`$many_many` {@see RelationSchema} says belongs to the
- * root record's class, recursively, regardless of what that class is. Both the SiteTree/CMSMain
- * flow ({@see \MadeCurious\RecordPacker\Jobs\SiteTreeExportJob}/`SiteTreeImportJob`) and the
- * generic DataObject/GridField flow ({@see \MadeCurious\RecordPacker\Jobs\RecordExportJob}/
- * `RecordImportJob`) share this one engine.
+ * Exports a single DataObject into a flat,serializable node graph, and reverses that graph back 
+ * into real records on import.
  *
  * Export phase 1 ({@see discover()}) walks has_many/many_many to build every node and record its
- * has_one targets as raw {class, id} pairs; phase 2 ({@see resolveReferences()}) converts those
- * raw pairs into local-ID references now that the full node set is known.
+ * has_one targets as raw {class, id} pairs
+ * Export phase 2 ({@see resolveReferences()}) converts those raw pairs into local-ID references 
+ * now that the full node set is known.
  *
- * Import mirrors this; * pass 1 ({@see import()}'s own loop plus {@see createNode()}) creates
- * every node (scalar fields only) so every local ID maps to a real record; pass 2
- * ({@see applyRelations()}) resolves has_one (incl. polymorphic + asset) relations and many_many
- * associations through that local-ID map.
+ * Import mirrors this;
+ * Pass 1 ({@see import()}'s own loop plus {@see createNode()}) creates every node so every local 
+ * ID maps to a real record 
+ * Pass 2 ({@see applyRelations()}) resolves has_one/many_many through that local-ID map.
  *
  * File/Image has_one relations are handled separately via {@see AssetBundler}
  */
@@ -88,12 +82,7 @@ class RecordSerializer
         return [
             'format' => 1,
             'rootLocalId' => $rootLocalId,
-            // meta populates the preview on import so we don't have to unzip first. title/
-            // urlSegment are both genuinely optional: title is resolved via the record's own
-            // PackingPolicy (see PackingPolicy::displayTitle()'s own doc comment for why that's
-            // the seam rather than this otherwise-generic class hardcoding a field name), while
-            // urlSegment is a SiteTree-only concept this class has no business assuming exists on
-            // an arbitrary DataObject at all — no PackingPolicy hook for it, just a direct check.
+            // meta populates the preview on import so we don't have to unzip first.
             'meta' => [
                 'className' => $record->ClassName,
                 'title' => PackableExtension::policyFor($record)->displayTitle($record),
@@ -119,13 +108,9 @@ class RecordSerializer
 
         $assetsManifest = (array) ($manifest['assets'] ?? []);
 
-        // Pass 1: create every node (scalar fields only) so every local ID maps to a real record
-        // before any relation — including lateral/sibling ones — gets resolved. Every has_one
+        // Pass 1: create every node so every local ID maps to a real record. Every has_one
         // relation is still empty at this point by design, so validation is deliberately disabled
-        // for these writes — a project's validate() may legitimately require a relation to be
-        // set (e.g. "this record must point at a Field"), which pass 1 can never satisfy no
-        // matter what order nodes are created in. Pass 2's write (see applyRelations()), once
-        // every relation is actually in place, runs with validation restored to normal.
+        // for these writes
         $originalValidationEnabled = DataObject::config()->uninherited('validation_enabled');
         DataObject::config()->set('validation_enabled', false);
 
@@ -152,8 +137,7 @@ class RecordSerializer
             DataObject::config()->set('validation_enabled', $originalValidationEnabled);
         }
 
-        // Pass 2: now that every node exists, resolve has_one (incl. polymorphic + asset)
-        // relations and many_many associations through the local-ID map built above.
+        // Pass 2: now that every node exists, resolve relations through the local-ID map
         foreach ($nodes as $localId => $node) {
             $localId = (string) $localId;
 
@@ -167,10 +151,6 @@ class RecordSerializer
         return $root;
     }
 
-    /**
-     * @return string[] Warnings accumulated during the most recent {@see export()} or
-     *     {@see import()} call.
-     */
     public function warnings(): array
     {
         return $this->warnings;
@@ -284,10 +264,9 @@ class RecordSerializer
     }
 
     /**
-     * Always records which file was referenced (hash/filename/mime), even when "include assets"
-     * is off, so an importer can still attempt to match an existing file with the same content
-     * on the target site; only embeds the actual bytes into the export zip when includeAssets
-     * is true.
+     * Always records which file was referenced (hash/filename/mime) so an importer can still 
+     * attempt to match an existing file with the same content on the target site, but only 
+     * embeds the actual bytes into the export zip when includeAssets is true.
      */
     private function captureAssetReference(DataObject $record, string $relationName): ?string
     {
@@ -308,17 +287,12 @@ class RecordSerializer
             return [];
         }
 
-        // One batched lookup covering every reference in this field, rather than a separate
-        // File::get()->byID() per shortcode — a field embedding dozens of images would otherwise
-        // fire dozens of individual SELECTs.
+        // One batched lookup covering every reference in this field
         $ids = array_unique(array_column($references, 'id'));
         $filesByID = [];
 
         foreach (File::get()->filter(['ID' => $ids]) as $file) {
-            // exists() (not just a hydrated DB row) also verifies the physical asset is actually
-            // present on the storage backend — an orphaned File row whose file was deleted is a
-            // routine real-world state, not an edge case; see captureAssetReference()'s own
-            // identical guard for the has_one path.
+            // exists() verifies the physical asset is actually present, not an orphaned record
             if ($file->exists()) {
                 $filesByID[$file->ID] = $file;
             }
@@ -507,11 +481,6 @@ class RecordSerializer
         foreach ((array) ($node['hasOne'] ?? []) as $relationName => $ref) {
             $target = $this->resolveReference($ref);
             $record->setComponent($relationName, $target);
-            // Unlike assetHasOne above, $changed must be set even when $target is null: a
-            // has_one that failed to resolve (e.g. an external/unresolvable reference) still
-            // needs pass 2's real, validated write to run so a project's validate() can catch a
-            // required relation that's still missing — see
-            // ImportValidationOrderingTest::testValidationIsStillEnforcedOnceRelationsAreApplied().
             $changed = true;
         }
 

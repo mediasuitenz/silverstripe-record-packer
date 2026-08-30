@@ -20,14 +20,7 @@ use Symbiote\QueuedJobs\Services\QueuedJob;
 use Throwable;
 
 /**
- * Reads a single record's current content and produces a downloadable export zip. Works for any
- * DataObject — {@see SiteTreeExportJob} is a thin subclass used for SiteTree pages specifically
- * (see its own doc comment for the little that's actually different).
- *
- * Only engages Versioned's LIVE mode when the target record's class is actually versioned — an
- * ordinary, unversioned DataObject (e.g. a catalogue/config record edited via a plain GridField)
- * has no draft/live distinction to switch between at all, so its current content simply IS what
- * gets exported.
+ * Reads a single record's current content and produces a downloadable export zip.
  */
 class RecordExportJob extends AbstractQueuedJob implements QueuedJob
 {
@@ -84,11 +77,6 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
         return md5(sprintf('%s-%s', static::signaturePrefix(), $id));
     }
 
-    /**
-     * Public so a caller checking many records at once (e.g. GridFieldRecordExportAction batching
-     * a whole grid's worth of pending-job signatures into one query) can compute a signature from
-     * just an ID/class pair — without needing a hydrated record instance for each one.
-     */
     public static function signatureForIdAndClass(int $id, string $className): string
     {
         return md5(sprintf('%s-%s-%s', static::signaturePrefix(), $id, $className));
@@ -147,13 +135,7 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
                 throw new RuntimeException("Record #{$recordID} no longer exists.");
             }
 
-            // Only switch into LIVE mode when the record has actually been published at least
-            // once — a versioned-but-never-published record (e.g. a catalogue/config record kept
-            // versioned purely for audit history, not gated behind an explicit publish step) has
-            // no Live row to read at all, so switching stage would make it look deleted instead
-            // of exporting its current (Draft) content the way an unversioned DataObject would.
-            // isPublished() only needs the record's ID and checks the LIVE stage directly, so
-            // it's safe to call on this instance regardless of which mode it was fetched under.
+            // Only switch into LIVE mode if the record has been published at least once
             $isPublished = $record->hasExtension(Versioned::class) && $record->isPublished();
 
             if (!$isPublished) {
@@ -207,9 +189,7 @@ class RecordExportJob extends AbstractQueuedJob implements QueuedJob
 
         if ($slug === '') {
             $title = PackableExtension::policyFor($record)->displayTitle($record) ?? get_class($record);
-            // Same filter SiteTree itself uses to derive URLSegment from Title — transliterates
-            // non-ASCII characters into something usable instead of just dropping them, unlike a
-            // hand-rolled [^A-Za-z0-9]+ regex.
+            // Same filter SiteTree itself uses to derive URLSegment from Title
             $slug = (new URLSegmentFilter())->filter($title);
         }
 

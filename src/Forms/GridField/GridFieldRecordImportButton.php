@@ -14,13 +14,7 @@ use SilverStripe\Security\Permission;
 use SilverStripe\View\Requirements;
 
 /**
- * An opt-in GridField toolbar component — add it to a GridFieldConfig (alongside
- * GridFieldAddNewButton) to let editors create a new record in that GridField by uploading a
- * previously exported record file. The GridField/DataObject equivalent of the page tree's
- * "Add new page" import option — see CMSMainAddFormImportExtension — but opt-in rather than
- * automatic, since (unlike the page tree) not every GridField is a sensible import target.
- *
- * Renders nothing for a GridField whose model class doesn't have PackableExtension applied.
+ * Let editors create a new record in a GridField by uploading a previously exported zip.
  */
 class GridFieldRecordImportButton implements GridField_HTMLProvider
 {
@@ -59,8 +53,7 @@ class GridFieldRecordImportButton implements GridField_HTMLProvider
         $form = $controller->ImportModalForm();
         $form->Fields()->dataFieldByName('RecordClassName')->setValue($modelClass);
         $form->Fields()->dataFieldByName('BackURL')->setValue(CurrentBackUrl::capture());
-        // Lets doImport() redirect straight into the new stub's own edit view — see
-        // ImportModalForm()'s own comment on this field.
+        // Lets doImport() redirect straight into the new stub's own edit view
         $form->Fields()->dataFieldByName('GridFieldLink')->setValue($gridField->Link());
         $form->Fields()->insertAfter('ImportFile', LiteralField::create(
             'PackerImportPreview',

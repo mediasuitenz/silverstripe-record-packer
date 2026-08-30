@@ -1,11 +1,7 @@
 /**
- * Generic import preview widget: watches an UploadField for a completed upload and fills its
- * companion `.record-packer-import-preview[data-preview-url]` container with a summary (class/
- * title/asset count) via the same importPreview() endpoint the page-tree "Add new page" import
- * flow uses (see madecurious/silverstripe-page-packer's own import-preview.js) — generalised via
- * data attributes so it works for any number of import modals on the same page (e.g. one per
- * packable GridField) rather than a single hardcoded #PagePackerImportPreview element tied to
- * one upload field name (that element is that other module's own, SiteTree-specific, flow).
+ * Generic import preview widget that watches an UploadField for a completed upload and fills the
+ * `.record-packer-import-preview[data-preview-url]` container with a summary via the
+ * importPreview() endpoint
  */
 (function () {
     if (window.__recordPackerImportPreviewReady) { return; }
@@ -70,10 +66,7 @@
 
     function checkContainer(container) {
         var fieldName = container.getAttribute('data-upload-field-name');
-        // Scoped to the container's own modal (not the whole document) so two packable
-        // GridFields' import modals open at once don't read each other's uploaded file — every
-        // modal renders the same field name ("ImportFile"), disambiguated only by which modal
-        // it lives inside.
+        // Scoped to the container's own modal in case of multiple grids on one page
         var scope = container.closest('.modal') || document;
         var input = scope.querySelector('input[name="' + fieldName + '[Files][]"]');
         var fileId = input ? input.value : null;

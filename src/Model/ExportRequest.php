@@ -14,22 +14,7 @@ use Symbiote\QueuedJobs\Controllers\QueuedJobsAdmin;
 use Symbiote\QueuedJobs\DataObjects\QueuedJobDescriptor;
 
 /**
- * Tracks one export bundle for a record — either an actual export job's output (Origin=Export)
- * or the file originally uploaded to create the record via import (Origin=Import, registered as
- * that record's first history entry so an author has an immediate downloadable snapshot of what
- * was imported without needing to trigger a fresh export first).
- *
- * One shared table serves both the SiteTree/CMSMain flow and the generic DataObject/GridField
- * flow — `Record` is declared against the bare `DataObject::class`, which SilverStripe treats as
- * a polymorphic has_one (it adds a companion `RecordClass` column alongside `RecordID`), so this
- * one model works for a page just as well as it does for any other project DataObject with
- * {@see \MadeCurious\RecordPacker\Extensions\PackableExtension} applied.
- *
- * Shown as a history list — the page's Content Export tab for a SiteTree page (via
- * {@see \MadeCurious\RecordPacker\Extensions\PackableExtension}/`CMSPageContentExportController`),
- * or the record's own edit form for anything else (via
- * {@see \MadeCurious\RecordPacker\Extensions\PackableExtension}) — newest first, each with a
- * download link once Status=Complete and a badge indicating staleness.
+ * Tracks one export bundle for a record
  */
 class ExportRequest extends DataObject
 {
@@ -45,8 +30,6 @@ class ExportRequest extends DataObject
     private static $db = [
         'Status' => "Enum('Queued,Complete,Failed','Queued')",
         'Origin' => "Enum('Export,Import','Export')",
-        // The most recent LastEdited found across the record and everything it owns (see
-        // ContentTimestampWalker) at capture time
         'SourceContentTimestamp' => 'Varchar(32)',
         'StatusMessage' => 'Text',
         'Description' => 'Varchar(255)',
@@ -57,11 +40,6 @@ class ExportRequest extends DataObject
         'Record' => DataObject::class,
         'Member' => Member::class,
         'ResultFile' => File::class,
-        // Set at queue time (export) or on completion/failure (import) so the Status column can
-        // link straight through to the job's own admin/queuedjobs record — its live progress
-        // while Queued/Running, or its log/error detail once finished. Left null once the
-        // descriptor itself is gone (e.g. purged by symbiote's own cleanup), in which case the
-        // Status column just falls back to plain text — see getStatusLinkHtml().
         'QueuedJobDescriptor' => QueuedJobDescriptor::class,
     ];
 
@@ -91,12 +69,6 @@ class ExportRequest extends DataObject
         'StatusLinkHtml' => 'HTMLFragment',
     ];
 
-    /**
-     * SITETREE_IMPORT_EXPORT for a SiteTree page's history, RECORD_IMPORT_EXPORT for anything
-     * else — the two permissions stay independently grantable (see
-     * ImportExportPermissions::RECORD_IMPORT_EXPORT's own doc comment) even though they now share
-     * one model/table.
-     */
     public function canView($member = null)
     {
         return Permission::checkMember($member, $this->permissionCode());
@@ -117,16 +89,6 @@ class ExportRequest extends DataObject
         return $this->canView($member);
     }
 
-    /**
-     * Resolved from the record's own {@see PackableExtension} — whichever {@see PackingPolicy}
-     * variant it was configured with (the default, or e.g. SiteTree's) is what actually decides
-     * this, so this class has no need to (and, for a clean core/SiteTree-integration split,
-     * mustn't) re-derive that decision itself by checking the record's class directly.
-     * {@see PackableExtension::policyFor()} already falls back to the default policy's own code
-     * if the class no longer has PackableExtension applied at all — e.g. a still-installed but
-     * no-longer-packable class, for an old ExportRequest row — which happens to be the same
-     * ImportExportPermissions::RECORD_IMPORT_EXPORT code this used to fall back to directly.
-     */
     private function permissionCode(): string
     {
         return PackableExtension::policyFor((string) $this->RecordClass)->permissionCode();
@@ -134,22 +96,12 @@ class ExportRequest extends DataObject
 
     /**
      * Compares SourceContentTimestamp against a fresh walk of the record's current content.
-     * Only reads through the LIVE stage when the record's class is actually versioned — an
-     * ordinary, unversioned DataObject (e.g. a catalogue/config record edited via a plain
-     * GridField) has no draft/live distinction at all, so its current content simply IS what
-     * would be exported.
      */
     public function isStale(): bool
     {
         return $this->isStaleForTimestamp($this->latestRecordTimestamp());
     }
 
-    /**
-     * {@see isStale()}'s comparison, split out so a caller that already knows the record's latest
-     * content timestamp — e.g. {@see ExportHistoryField} computing it once per distinct record
-     * rather than once per history row — can skip repeating {@see latestRecordTimestamp()}'s
-     * relation-graph walk for every row that shares the same RecordClass/RecordID.
-     */
     public function isStaleForTimestamp(?string $currentTimestamp): bool
     {
         if (!$this->RecordID || !$this->RecordClass) {
@@ -162,8 +114,7 @@ class ExportRequest extends DataObject
         }
 
         if ($this->SourceContentTimestamp === '' || $this->SourceContentTimestamp === null) {
-            // Origin=Import: no content captured at creation time; anything existing now means
-            // a publish/edit has happened since
+            // Origin=Import: anything existing now means a publish/edit has happened since
             return true;
         }
 
@@ -171,10 +122,7 @@ class ExportRequest extends DataObject
     }
 
     /**
-     * The most recent LastEdited found across the record and everything it owns, right now —
-     * public so a caller rendering several ExportRequests for the same record (see
-     * {@see ExportHistoryField}) can compute this once and reuse it via
-     * {@see isStaleForTimestamp()}/{@see staleBadgeForTimestamp()} rather than once per row.
+     * The most recent LastEdited found across the record and everything it owns
      */
     public function latestRecordTimestamp(): ?string
     {
@@ -223,10 +171,6 @@ class ExportRequest extends DataObject
         return $this->staleBadgeForTimestamp($this->latestRecordTimestamp());
     }
 
-    /**
-     * {@see getStaleBadge()}, given an already-computed timestamp — see
-     * {@see isStaleForTimestamp()}'s own doc comment for why this split exists.
-     */
     public function staleBadgeForTimestamp(?string $currentTimestamp): string
     {
         return $this->isStaleForTimestamp($currentTimestamp)
@@ -235,11 +179,7 @@ class ExportRequest extends DataObject
     }
 
     /**
-     * The Status column's value, linked through to this request's own QueuedJobDescriptor in
-     * admin/queuedjobs — its live progress while Queued/Running, or its log/error detail once
-     * finished. Falls back to plain (escaped) status text once there's nothing to link to: no
-     * descriptor was ever recorded (older rows, from before this existed), the descriptor's since
-     * been purged, or the current member can't access the Jobs admin section anyway.
+     * The Status column's value, linked through to the relevant QueuedJob
      */
     public function getStatusLinkHtml(): string
     {
@@ -265,17 +205,7 @@ class ExportRequest extends DataObject
     }
 
     /**
-     * ModelAdmin::getCMSEditLinkForManagedDataObject() — the obvious/generic way to build this —
-     * gets the wrong field-name segment for QueuedJobsAdmin specifically: it assumes the
-     * standard convention (the sanitised FQCN, e.g. "Symbiote-QueuedJobs-DataObjects-
-     * QueuedJobDescriptor"), but QueuedJobsAdmin::getEditForm() replaces the auto-scaffolded
-     * field with its own GridField hardcoded to the plain short name "QueuedJobDescriptor"
-     * instead (see that method's own `GridField::create('QueuedJobDescriptor', ...)` call) —
-     * using the generic helper produces a link FormRequestHandler can't route ("I can't handle
-     * sub-URLs on class SilverStripe\Forms\FormRequestHandler"). getLinkForModelClass() for the
-     * base URL is still reliable (it doesn't depend on the field name, just the model tab), so
-     * only the field-name segment and the trailing "/edit" are hand-built here to match what
-     * QueuedJobsAdmin's own form actually uses.
+     * Built manually because it resolves wrongly otherwise
      */
     private function queuedJobEditLink(QueuedJobDescriptor $descriptor): string
     {

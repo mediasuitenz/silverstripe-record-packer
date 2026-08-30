@@ -27,19 +27,6 @@ use SilverStripe\Security\Security;
 use Symbiote\QueuedJobs\Services\QueuedJobService;
 use Throwable;
 
-/**
- * The generic-DataObject/GridField equivalent of the page tree's export/import wiring
- * (CMSMainExportActionExtension + CMSMainAddFormImportExtension) — a small, standalone
- * controller registered by its own route (see _config/routes.yml), rather than attached to
- * CMSMain, so {@see PackableExtension}'s "Export" trigger and
- * {@see \MadeCurious\RecordPacker\Forms\GridField\GridFieldRecordImportButton}'s "Import" trigger
- * both have somewhere to post to regardless of which admin section/GridField happens to be
- * hosting the record — there's no single "CMSMain" for arbitrary project DataObjects the way
- * there is for pages.
- *
- * Kept entirely separate from the SiteTree/CMSMain flow, which continues to use its own hosted
- * forms unchanged.
- */
 class RecordPackerController extends Controller
 {
     private static $url_segment = 'record-packer';
@@ -62,11 +49,6 @@ class RecordPackerController extends Controller
         $fields = FieldList::create(
             HiddenField::create('RecordClassName'),
             HiddenField::create('RecordID'),
-            // Populated by the caller (see PackingPolicy::getExportModalForm()) from the URL
-            // that's actually being viewed at the moment the trigger is built, rather than left
-            // to the submitting request's Referer header — which a Referrer-Policy, browser
-            // privacy setting, or extension can omit or strip entirely, silently falling back to
-            // the site root. See redirectToReferer()'s own doc comment.
             HiddenField::create('BackURL'),
             CheckboxField::create(
                 'IncludeAssets',
@@ -118,14 +100,7 @@ class RecordPackerController extends Controller
     {
         $fields = FieldList::create(
             HiddenField::create('RecordClassName'),
-            // See ExportModalForm()'s own comment on BackURL.
             HiddenField::create('BackURL'),
-            // Populated by GridFieldRecordImportButton from the very $gridField instance it's
-            // rendering into — lets doImport() redirect straight into the new stub's own edit
-            // view once queued, the same "land on the new record" behaviour the page tree already
-            // gets for free from CMSMain's native "Add new page" flow (see
-            // CMSMainAddFormImportExtension). BackURL alone can't do this: it's just the grid's
-            // *list* URL, with no reusable way to build a specific item's edit URL from it.
             HiddenField::create('GridFieldLink'),
             UploadField::create(
                 'ImportFile',
@@ -180,9 +155,7 @@ class RecordPackerController extends Controller
 
         $stub = $class::create();
 
-        // Placeholder so the edit view we're about to redirect into isn't just blank while the
-        // queued job fills it in — mirrors CMSMainAddFormImportExtension's identical placeholder
-        // for the page-tree import flow.
+        // Placeholder so the edit view isn't just blank while the queued job runs
         if ($stub->hasField('Title')) {
             $stub->Title = _t(self::class . '.IMPORTING_TITLE', 'Importing…');
         }
@@ -198,17 +171,12 @@ class RecordPackerController extends Controller
             return $this->redirect($itemLink);
         }
 
-        // Fallback for the rare case GridFieldLink wasn't usable (missing/invalid, e.g. a
-        // GridField whose config doesn't route a normal item/edit URL) — back to the grid list,
-        // same as before this was added.
+        // Fallback for when GridFieldLink isn't usable
         return $this->redirectToReferer($backURL);
     }
 
     /**
-     * The guard doExport()/doImport() both start with — checks the permission, then that
-     * $data['RecordClassName'] is actually packable. Returns the validated class name on success,
-     * or the HTTPResponse the caller should return as-is on failure — check with instanceof
-     * before using the result as a class name.
+     * Ensures this is a Packable thing and we have permission
      */
     private function requirePackableClass(array $data): string|HTTPResponse
     {
@@ -225,11 +193,6 @@ class RecordPackerController extends Controller
         return $class;
     }
 
-    /**
-     * Builds the URL of $stub's own edit view inside the GridField that triggered this import, or
-     * null if $gridFieldLink isn't usable — either not captured at all (an older cached copy of
-     * GridFieldRecordImportButton's markup) or not actually a same-site URL.
-     */
     private function itemEditLink(string $gridFieldLink, DataObject $stub): ?string
     {
         if (!$gridFieldLink || !Director::is_site_url($gridFieldLink)) {
@@ -241,9 +204,7 @@ class RecordPackerController extends Controller
 
     /**
      * Reads a just-uploaded file's manifest and returns the meta block as JSON, so the editor
-     * can see what they're about to import before committing — same shape as
-     * CMSMainAddFormImportExtension::importPreview() for the page-tree flow, except "classExists"
-     * here means "packable and installed on this site" rather than "is a SiteTree subclass".
+     * can see what they're about to import before committing
      */
     public function importPreview(HTTPRequest $request): HTTPResponse
     {
@@ -266,7 +227,6 @@ class RecordPackerController extends Controller
             return $response->setStatusCode(422)->setBody(json_encode(['error' => $e->getMessage()]));
         }
 
-        // meta is absent for a file exported before this was added — fall back to the root
         $meta = $manifest['meta'] ?? null;
 
         if (!$meta) {
@@ -293,14 +253,7 @@ class RecordPackerController extends Controller
     }
 
     /**
-     * Redirects to wherever the modal's form was submitted from — there's no single fixed
-     * "record edit" URL the way the page tree has one. Prefers the explicit $backURL (the
-     * BackURL hidden field every caller populates from the URL actually being viewed at the
-     * moment the trigger was built — see ExportModalForm()'s own comment), falling back to the
-     * Referer header only if that's missing, and to the site root as a last resort. Deliberately
-     * doesn't trust Referer as the primary source: a Referrer-Policy, browser privacy setting, or
-     * extension can omit or strip it on an otherwise ordinary same-origin form POST, which
-     * silently sent every export/import here back to the site root instead of the CMS.
+     * Redirects to wherever the modal's form was submitted from
      */
     private function redirectToReferer(?string $backURL = null): HTTPResponse
     {

@@ -3,11 +3,10 @@
 namespace MadeCurious\RecordPacker\Serialization;
 
 /**
- * Finds and rewrites File/Image references embedded as shortcodes inside HTML content field
- * values since these are just text patterns inside a string, not a real has_one/has_many
- * relation, and so are invisible to the rest of the object-graph walk entirely.
+ * Finds and rewrites File/Image references embedded as shortcodes in HTML content fields 
+ * since these are text, not a real has_one/has_many relation
  *
- * The two regexes mirror `FileLinkTrackingParser`'s own detection patterns
+ * The regexes mirror `FileLinkTrackingParser`'s own detection patterns
  */
 class ContentShortcodeScanner
 {
@@ -26,7 +25,6 @@ class ContentShortcodeScanner
 
     /**
      * @return array<int, array{type: string, id: int}> Every shortcode found, in order
-     *     (duplicates included — callers dedupe if needed via the 'id').
      */
     public function extractReferences(string $content): array
     {

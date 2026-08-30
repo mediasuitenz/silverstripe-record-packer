@@ -4,14 +4,8 @@ namespace MadeCurious\RecordPacker\Support;
 
 /**
  * Builds the "trigger button carrying its whole modal as a `data-modal` HTML string" markup
- * shared by every place this module pops up a small form in a modal — the Export trigger
- * (PackableExtension, used for both SiteTree and any other packable DataObject) and the
- * GridField Import trigger (GridFieldRecordImportButton). Pulled out purely to avoid three
- * copies of the same wrapper
- * markup; the modal open/close behaviour itself lives in client/dist/js/export-modal.js, which
- * is generic (keyed off `data-toggle="modal"`/`data-modal`, not anything export-specific).
  */
-final class ModalMarkup
+class ModalMarkup
 {
     public static function modal(string $modalId, string $title, string $bodyHtml): string
     {

@@ -17,26 +17,14 @@ use Symbiote\QueuedJobs\DataObjects\QueuedJobDescriptor;
 use Symbiote\QueuedJobs\Services\QueuedJob;
 
 /**
- * An optional, opt-in GridField per-row action — add it to a GridFieldConfig (alongside
- * GridFieldDeleteAction etc., following the same GridField_ColumnProvider/GridField_ActionProvider
- * shape) to let an editor queue an export for a single row directly from the list, with no need
- * to open its detail view first. This is deliberately one-click/immediate with sane defaults
- * (referenced assets included, no description) — the detail view's own Export button (see
- * PackableExtension) remains where an editor chooses those options explicitly.
- *
- * Only ever renders for a GridField whose model class has {@see PackableExtension} applied,
- * mirroring {@see GridFieldRecordImportButton}.
+ * An optional, opt-in GridField per-row action
  */
 class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField_ActionProvider
 {
     private const ACTION_NAME = 'recordpackerexport';
 
     /**
-     * Set of RecordExportJob signatures currently queued/running, lazily built once per GridField
-     * render (one query covering every row's signature) rather than firing RecordLockExtension's
-     * own pendingJobExists() query for every row — see {@see hasPendingExport()}'s own doc
-     * comment. Scoped to this component instance's own lifetime, which SilverStripe's usual
-     * "build a fresh GridFieldConfig per GridField" convention keeps tied to one render.
+     * Set of RecordExportJob signatures currently in flight, lazily built once per render
      *
      * @var array<string, true>|null
      */
@@ -140,10 +128,7 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
     }
 
     /**
-     * Whether $record already has a queued/running RecordExportJob — batched once per GridField
-     * render (one query covering every row's signature) rather than RecordLockExtension's own
-     * pendingJobExists() firing its own SELECT for every row, purely to decide whether to grey
-     * out this column's icon.
+     * Whether $record already has a queued/running RecordExportJob
      */
     private function hasPendingExport(GridField $gridField, $record): bool
     {
@@ -155,15 +140,8 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
     }
 
     /**
-     * One query covering every row on the current page: map(ID, ClassName) rather than hydrating
-     * full records (a row's actual ClassName — not just $gridField->getModelClass() — matters
-     * here, since a subclassed row's real signature is computed from its own leaf class), then one
+     * One query covering every row on the current page: map(ID, ClassName), then one
      * QueuedJobDescriptor lookup for all of those signatures at once.
-     *
-     * Deliberately getManipulatedList(), not getList() — the latter is the raw, unpaginated list
-     * before GridFieldPaginator (or any other GridField_DataManipulator) has run; querying it
-     * directly would pull every row in the whole table on every render of a large GridField,
-     * exactly the kind of cost this batching was meant to avoid rather than reintroduce.
      *
      * @return array<string, true>
      */

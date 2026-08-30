@@ -20,18 +20,7 @@ use Throwable;
 
 /**
  * Populates a stub record from an uploaded export zip then runs {@see RecordSerializer}'s
- * two-pass import against it. Works for any DataObject — {@see SiteTreeImportJob} is a thin
- * subclass used for SiteTree pages specifically (see its own doc comment for the little that's
- * actually different).
- *
- * The stub is expected to already be the exact class this import should produce, or a
- * superclass of it — e.g. the model class of whichever GridField the import was triggered from
- * (see GridFieldRecordImportButton), or (for the page tree) a bare, un-typed SiteTree, since the
- * editor there is choosing "import" INSTEAD OF picking a page type up front. This job only
- * reclasses the stub if the manifest's root node turns out to be a MORE SPECIFIC subclass of the
- * stub's current class (mirroring newClassInstance()), and fails outright if the manifest's root
- * class isn't the stub's class or a subclass of it — there's no reasonable way to import, say,
- * an exported Product into a Catalogue GridField.
+ * two-pass import against it.
  */
 class RecordImportJob extends AbstractQueuedJob implements QueuedJob
 {
@@ -78,18 +67,13 @@ class RecordImportJob extends AbstractQueuedJob implements QueuedJob
         return md5(sprintf('%s-%s', static::signaturePrefix(), $id));
     }
 
-    /**
-     * Overridden by SiteTreeImportJob so a page's signature stays namespaced separately from a
-     * generic record's, even though both otherwise compute the same way.
-     */
     protected static function signaturePrefix(): string
     {
         return 'record-import';
     }
 
     /**
-     * The word used for "class" in this job's own error messages — overridden by
-     * SiteTreeImportJob to restore the original "page type" wording.
+     * The word used for "class" in this job's own error messages
      */
     protected static function rootClassLabel(): string
     {
@@ -223,12 +207,6 @@ class RecordImportJob extends AbstractQueuedJob implements QueuedJob
         $this->createExportRequest($stub, ExportRequest::STATUS_FAILED, $this->uploadedFileID, null, $e->getMessage());
     }
 
-    /**
-     * The ExportRequest history row doImport()/failStub() each create on completion/failure —
-     * shared here since both otherwise repeat the same 6 fields (RecordID, RecordClass, MemberID,
-     * Origin, ResultFileID, QueuedJobDescriptorID) alongside their own one or two distinguishing
-     * fields ($includeAssets on success, $statusMessage on failure).
-     */
     private function createExportRequest(
         DataObject $record,
         string $status,
@@ -256,13 +234,6 @@ class RecordImportJob extends AbstractQueuedJob implements QueuedJob
         $exportRequest->write();
     }
 
-    /**
-     * This job doesn't otherwise know its own QueuedJobDescriptor ID while running — nothing in
-     * symbiote's AbstractQueuedJob exposes it — so it's looked up by signature instead. Safe here
-     * specifically because this job's signature is ID-only (see signaturePrefix()/getSignature())
-     * and QueuedJobService::queueJob() itself refuses to double-queue a matching signature, so
-     * exactly one descriptor exists for this stub at any moment this job could be running.
-     */
     private function currentJobDescriptorID(): ?int
     {
         $descriptor = QueuedJobDescriptor::get()->filter('Signature', $this->getSignature())->first();

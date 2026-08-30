@@ -12,14 +12,8 @@ use Symbiote\QueuedJobs\DataObjects\QueuedJobDescriptor;
 use Symbiote\QueuedJobs\Services\QueuedJob;
 
 /**
- * Locks a DataObject (one with {@see PackableExtension} applied, or a SiteTree page) while an
+ * Locks a DataObject (one with {@see PackableExtension} applied) while an
  * export or import job for it is in flight.
- *
- * Which job classes to check, which permission gates it, and the locked-record warning's
- * wording all come from an injected {@see PackingPolicy} — `SiteTree` applies this exact same
- * extension class as any other packable DataObject, just wired to the `.sitetree` policy
- * variant in this module's `_config/extensions.yml` rather than via a SiteTree-specific
- * subclass. See {@see PackingPolicy}'s own doc comment for why.
  */
 class RecordLockExtension extends Extension
 {
@@ -61,8 +55,6 @@ class RecordLockExtension extends Extension
             '<div class="alert alert-warning">' . nl2br($this->policy->lockedWarningMessage()) . '</div>'
         );
 
-        // A plain DataObject's scaffolded fields aren't guaranteed to be a TabSet the way
-        // SiteTree's always are, so fall back to a flat unshift().
         if ($fields->hasTabSet()) {
             $fields->addFieldToTab('Root.Main', $warning);
         } else {
@@ -71,9 +63,7 @@ class RecordLockExtension extends Extension
     }
 
     /**
-     * @param string[] $jobClasses Defaults to both of the policy's job classes; callers that
-     *     only care about one (e.g. a GridField's own export button only needs to dedupe
-     *     against export jobs, not import jobs) can narrow this.
+     * @param string[] $jobClasses Defaults to both of the policy's job classes
      */
     public function pendingJobExists(?array $jobClasses = null): bool
     {
