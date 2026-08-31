@@ -1,0 +1,17 @@
+---
+Name: record-packer-extensions
+---
+SilverStripe\Core\Injector\Injector:
+  MadeCurious\RecordPacker\Support\PackingPolicy.record:
+    class: MadeCurious\RecordPacker\Support\RecordPackingPolicy
+  MadeCurious\RecordPacker\Support\PackingPolicy: '%$MadeCurious\RecordPacker\Support\PackingPolicy.record'
+
+# Mismatch handling for an unsupported relation/class/property
+# — 'fail' aborts an export/import with a clear error
+# - 'best_effort' skips what doesn't match and records a warning instead.
+MadeCurious\RecordPacker\Serialization\RecordSerializer:
+  mismatch_behaviour: fail
+
+SilverStripe\Forms\GridField\GridFieldDetailForm_ItemRequest:
+  extensions:
+    - MadeCurious\RecordPacker\Extensions\GridFieldRecordActionsExtension

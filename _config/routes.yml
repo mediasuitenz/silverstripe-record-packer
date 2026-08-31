@@ -1,0 +1,6 @@
+---
+Name: record-packer-routes
+---
+SilverStripe\Control\Director:
+  rules:
+    'record-packer//$Action/$ID': 'MadeCurious\RecordPacker\Controllers\RecordPackerController'
