@@ -1,7 +1,20 @@
 # silverstripe-record-packer
 
-This branch (`cms5`) is intentionally kept minimal so incoming work can be reviewed properly as a
-pull request.
+Serialises and deserialises objects from within the CMS to facilitate transfer between environments.
 
-All development happens on [`develop-cms5`](../../tree/develop-cms5) — open a PR from
-`develop-cms5` into `cms5` to review the module in full.
+Zips up a json record of the object and its relations, alongside an optional assets bundle.
+
+## Workflow
+
+- open record detail view
+- hit "Export" action button
+- give the item a description, choose whether or not to include assets
+- lock the object while the export is pending
+- use Queued Job to export Live version of record
+- visit CMS tab to download file
+- open relevant Gridfield in target site
+- use Import gridfield action to upload file
+- check preview to ensure the right content
+- get taken to stub record while import is pending
+- use Queued Job to import a Draft version of the record
+- save and publish once ready
