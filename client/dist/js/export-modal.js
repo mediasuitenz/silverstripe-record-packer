@@ -57,4 +57,31 @@
             closeModal(e.target);
         }
     });
+
+    // GridFieldRecordExportAction's "..." menu entry can't carry a data-toggle/data-modal
+    // trigger so it links straight into the record's edit view instead, marked with this hash
+    var EXPORT_HASH = '#recordpacker-export';
+
+    function autoFireExportFromHash() {
+        if (window.location.hash !== EXPORT_HASH) {
+            return;
+        }
+
+        var trigger = document.querySelector('[data-toggle="modal"][data-target^="#PackerExportModal"]');
+
+        if (!trigger) {
+            return;
+        }
+
+        // Clear the marker first so re-renders, or navigating back/forward, don't re-fire this.
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        trigger.click();
+    }
+
+    if (window.MutationObserver) {
+        new MutationObserver(autoFireExportFromHash).observe(document.body, { childList: true, subtree: true });
+    }
+
+    window.addEventListener('hashchange', autoFireExportFromHash);
+    autoFireExportFromHash();
 })();
