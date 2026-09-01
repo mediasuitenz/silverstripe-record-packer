@@ -6,23 +6,22 @@ use MadeCurious\RecordPacker\Extensions\PackableExtension;
 use MadeCurious\RecordPacker\Extensions\RecordLockExtension;
 use MadeCurious\RecordPacker\Jobs\RecordExportJob;
 use MadeCurious\RecordPacker\Security\ImportExportPermissions;
-use MadeCurious\RecordPacker\Support\ExportQueuer;
+use SilverStripe\Control\Controller;
 use SilverStripe\Forms\GridField\GridField;
-use SilverStripe\Forms\GridField\GridField_ActionProvider;
+use SilverStripe\Forms\GridField\GridField_ActionMenuItem;
+use SilverStripe\Forms\GridField\GridField_ActionMenuLink;
 use SilverStripe\Forms\GridField\GridField_ColumnProvider;
-use SilverStripe\Forms\GridField\GridField_FormAction;
-use SilverStripe\ORM\ValidationException;
 use SilverStripe\Security\Permission;
+use SilverStripe\View\HTML;
 use Symbiote\QueuedJobs\DataObjects\QueuedJobDescriptor;
 use Symbiote\QueuedJobs\Services\QueuedJob;
 
 /**
  * An optional, opt-in GridField per-row action
+ * Links straight into the edit view and opens the export modal
  */
-class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField_ActionProvider
+class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField_ActionMenuLink
 {
-    private const ACTION_NAME = 'recordpackerexport';
-
     /**
      * Set of RecordExportJob signatures currently in flight, lazily built once per render
      *
@@ -52,58 +51,45 @@ class GridFieldRecordExportAction implements GridField_ColumnProvider, GridField
         return ['Actions'];
     }
 
-    public function getActions($gridField)
-    {
-        return [self::ACTION_NAME];
-    }
-
+    /**
+     * Fallback link for when the "..." menu isn't there
+     */
     public function getColumnContent($gridField, $record, $columnName)
-    {
-        $field = $this->getExportAction($gridField, $record);
-
-        return $field ? $field->Field() : null;
-    }
-
-    public function handleAction(GridField $gridField, $actionName, $arguments, $data)
-    {
-        if ($actionName !== self::ACTION_NAME) {
-            return;
-        }
-
-        $record = $gridField->getList()->byID($arguments['RecordID']);
-
-        if (!$record) {
-            return;
-        }
-
-        if (!$this->canExport($gridField, $record)) {
-            throw new ValidationException(
-                _t(self::class . '.EXPORT_PERMISSION_FAILURE', 'No permission to export this record')
-            );
-        }
-
-        ExportQueuer::queue($record, RecordExportJob::class, true);
-    }
-
-    private function getExportAction(GridField $gridField, $record): ?GridField_FormAction
     {
         if (!$this->canExport($gridField, $record)) {
             return null;
         }
 
-        $title = _t(self::class . '.EXPORT', 'Export');
+        $title = (string) _t(self::class . '.EXPORT', 'Export');
 
-        return GridField_FormAction::create(
-            $gridField,
-            'RecordPackerExport' . $record->ID,
-            false,
-            self::ACTION_NAME,
-            ['RecordID' => $record->ID]
-        )
-            ->addExtraClass('btn--icon-md font-icon-share btn--no-text grid-field__icon-action action-menu--handled')
-            ->setAttribute('classNames', 'font-icon-share')
-            ->setDescription($title)
-            ->setAttribute('aria-label', $title);
+        return HTML::createTag('a', [
+            'href' => $this->getUrl($gridField, $record, $columnName),
+            'class' => 'btn--icon-md btn--no-text grid-field__icon-action action-menu--handled font-icon-share',
+            'title' => $title,
+            'aria-label' => $title,
+        ]);
+    }
+
+    public function getTitle($gridField, $record, $columnName)
+    {
+        return (string) _t(self::class . '.EXPORT', 'Export');
+    }
+
+    public function getGroup($gridField, $record, $columnName)
+    {
+        return $this->canExport($gridField, $record) ? GridField_ActionMenuItem::DEFAULT_GROUP : null;
+    }
+
+    public function getExtraData($gridField, $record, $columnName)
+    {
+        return ['classNames' => 'font-icon-share action-detail'];
+    }
+
+    public function getUrl($gridField, $record, $columnName)
+    {
+        $link = Controller::join_links($gridField->Link('item'), $record->ID, 'edit');
+
+        return $gridField->addAllStateToUrl($link) . '#recordpacker-export';
     }
 
     private function canExport(GridField $gridField, $record): bool
