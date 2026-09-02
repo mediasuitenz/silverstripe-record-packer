@@ -17,9 +17,9 @@ the options described below, ask an administrator to grant your Security group t
 
 1. Open the record you want to export (its own edit form, or its detail view inside a
    GridField).
-2. Click the **Export** button, alongside Save/Publish/Delete.
+2. Click the **Export** button on the action bar at the bottom of the page:
 
-_[screenshot: export button]_
+![screenshot_export_button](./img/screenshot_export_button_history.png)
 
 3. A dialog opens with two options:
    - **Include referenced files/images** — on by default. Bundles any files or images the
@@ -29,7 +29,7 @@ _[screenshot: export button]_
    - **Description** — an optional short note (e.g. "before Christmas campaign edits") to
      help you tell exports apart later.
 
-_[screenshot: export modal]_
+![screenshot_export_modal](./img/screenshot_export_modal.png)
 
 4. Click **Export**. The export runs in the background — it doesn't happen instantly. You
    land back where you started, and the record's **Export history** tab picks up a new
@@ -43,14 +43,14 @@ _[screenshot: export modal]_
 The record is locked for editing while the export is queued and running — this is to
 prevent new changes from being included partway through.
 
-_[screenshot: locked warning banner]_
+![screenshot_record_lock](./img/screenshot_record_lock.png)
 
 ### The Export history tab
 
 Every record that has been exported (or was itself created by importing a file) has an
 **Export history** tab alongside its other fields.
 
-_[screenshot: export history tab]_
+![screenshot_export_history](./img/screenshot_export_button_history.png)
 
 This tab lists every export and import for the record, most recent first, showing:
 
@@ -79,7 +79,7 @@ Imports happen from inside a GridField, not from the record's own edit form.
 1. Open the GridField the record type is managed in.
 2. Click the **Import** button in the GridField's toolbar.
 
-_[screenshot: GridField import button]_
+![screenshot_import_modeladmin](./img/screenshot_import_modeladmin.png)
 
 3. Upload the exported file. Once it finishes uploading, a preview panel appears showing:
    - The record type it will create
@@ -89,16 +89,21 @@ _[screenshot: GridField import button]_
      create a bare record in that case, but its specific fields/relations won't be
      recreated
 
-_[screenshot: import preview]_
+![screenshot_import_preview](./img/screenshot_import_preview.png)
 
 4. Check the preview, then click **Import**. You're taken straight to the new record's edit
    view, which is locked while the import runs in the background.
+
+![screenshot_import_pending](./img/screenshot_importing_pending.png)
+   
 5. Once the import finishes, the lock is lifted and the record is ready to review. If the
    record supports draft/published versions, it starts life as a **draft** — check it over
    and publish it yourself when you're happy with it. If it doesn't have that distinction,
    the imported content is simply there as its current saved state.
 
    Its Export history tab will already show the import file as history.
+
+![screenshot_import_complete](./img/screenshot_import_complete.png)
 
 If an import fails, the new record is kept (retitled to flag the failure, where it has a
 title field) rather than disappearing, and the Export history tab records a **Failed** entry
@@ -108,7 +113,7 @@ Some GridFields also add a one-click **Export** action per row, alongside the us
 button — an alternative to opening a record's detail view just to click its own Export
 button.
 
-_[screenshot: GridField row export action]_
+![screenshot_gridfield_action_button](./img/screenshot_gridfield_action_button.png)
 
 ## While an export or import is running
 
