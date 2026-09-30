@@ -49,6 +49,15 @@ class ExportRequest extends DataObject
 
     private static $default_sort = 'Created DESC';
 
+    /**
+     * RecordClass values (or ancestors thereof) for which the staleness walk is skipped entirely,
+     * so a fresh {@see ContentTimestampWalker} is never invoked against dense trees. The record's
+     * own LastEdited is used instead, ignoring anything it owns
+     *
+     * @var string[]
+     */
+    private static $skip_staleness_walk_for_classes = [];
+
     private static $summary_fields = [
         'Created' => 'Date',
         'Description' => 'Description',
@@ -122,7 +131,8 @@ class ExportRequest extends DataObject
     }
 
     /**
-     * The most recent LastEdited found across the record and everything it owns
+     * The most recent LastEdited found across the record and everything it owns, or — for a
+     * class listed in {@see $skip_staleness_walk_for_classes} — just the record's own LastEdited
      */
     public function latestRecordTimestamp(): ?string
     {
@@ -132,11 +142,16 @@ class ExportRequest extends DataObject
             return null;
         }
 
+        $skipWalk = $this->skipsStalenessWalk($class);
         $recordID = (int) $this->RecordID;
-        $walk = function () use ($class, $recordID): ?string {
+        $walk = function () use ($class, $recordID, $skipWalk): ?string {
             $record = $class::get()->byID($recordID);
 
-            return $record ? (new ContentTimestampWalker())->latestTimestamp($record) : null;
+            if (!$record) {
+                return null;
+            }
+
+            return $skipWalk ? $record->LastEdited : ContentTimestampWalker::create()->latestTimestamp($record);
         };
 
         if (!DataObject::singleton($class)->hasExtension(Versioned::class)) {
@@ -148,6 +163,20 @@ class ExportRequest extends DataObject
 
             return $walk();
         });
+    }
+
+    /**
+     * Whether $class (or an ancestor of it) is configured to skip the staleness walk
+     */
+    private function skipsStalenessWalk(string $class): bool
+    {
+        foreach ((array) $this->config()->get('skip_staleness_walk_for_classes') as $skipped) {
+            if (class_exists($skipped) && is_a($class, $skipped, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function getDownloadLink(): ?string
