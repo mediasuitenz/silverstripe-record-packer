@@ -249,6 +249,51 @@ class ExportRequestTest extends SapphireTest
      * genuinely unrelated owned has_many (TestCatalogue -> TestProduct) with no page/versioning
      * semantics at all.
      */
+    public function testStalenessWalkIsSkippedForAConfiguredClassAndUsesTheRecordsOwnLastEdited(): void
+    {
+        DBDatetime::set_mock_now('2024-01-01 12:00:00');
+
+        $catalogue = TestCatalogue::create(['Title' => 'A catalogue']);
+        $catalogue->write();
+
+        $product = TestProduct::create(['Title' => 'Widget']);
+        $product->CatalogueID = $catalogue->ID;
+        $product->write();
+
+        $request = ExportRequest::create([
+            'RecordID' => $catalogue->ID,
+            'RecordClass' => TestCatalogue::class,
+            'Origin' => ExportRequest::ORIGIN_EXPORT,
+            'SourceContentTimestamp' => $catalogue->LastEdited,
+        ]);
+        $request->write();
+
+        ExportRequest::config()->set('skip_staleness_walk_for_classes', [TestCatalogue::class]);
+
+        DBDatetime::set_mock_now('2024-01-01 12:05:00');
+        $product->Title = 'Updated widget';
+        $product->write();
+
+        $this->assertSame(
+            $catalogue->LastEdited,
+            $request->latestRecordTimestamp(),
+            'A configured class must skip the owned-tree walk and fall back to its own LastEdited.'
+        );
+        $this->assertFalse(
+            $request->isStale(),
+            'An edit to an owned child must be invisible once the walk is skipped for this class.'
+        );
+
+        DBDatetime::set_mock_now('2024-01-01 12:10:00');
+        $catalogue->Title = 'Edited catalogue';
+        $catalogue->write();
+
+        $this->assertTrue(
+            $request->isStale(),
+            'An edit to the record itself must still be visible even with the walk skipped.'
+        );
+    }
+
     public function testStaleAfterEditingAnOwnedChildOfAGenericRecordEvenWhenTheParentIsUntouched(): void
     {
         DBDatetime::set_mock_now('2024-01-01 12:00:00');

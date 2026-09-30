@@ -108,6 +108,12 @@ Two further sets of config on `RelationSchema` are overridable per project:
   (`record-packer-imports`) used both to store outgoing export zips and to materialise
   incoming imported assets. The import upload field itself writes to a separate, hard-coded
   folder, `record-packer-uploads`.
+- `ExportRequest::$skip_staleness_walk_for_classes` — a list of `RecordClass` values (or
+  ancestors thereof) for which the staleness check (`isStale()`/`StaleBadge`) skips running a
+  fresh `ContentTimestampWalker` over the record's owned tree, falling back to just the
+  record's own `LastEdited` instead. Useful for dense trees where the walk is expensive to
+  run on every CMS list view; an edit to an owned child will no longer be detected as making
+  the export stale for these classes.
 
 ## What actually gets exported
 
